@@ -23,7 +23,7 @@ import os
 from tqdm import tqdm
 import numpy as np
 from six.moves import xrange
-from nltk.tokenize.moses import MosesDetokenizer
+#from nltk.tokenize.moses import MosesDetokenizer
 
 from preprocessing.squad_preprocess import data_from_json, tokenize
 from vocab import UNK_ID, PAD_ID
@@ -164,7 +164,7 @@ def preprocess_dataset(dataset):
         article_paragraphs = dataset['data'][articles_id]['paragraphs']
         for pid in range(len(article_paragraphs)):
 
-            context = unicode(article_paragraphs[pid]['context']) # string
+            context = article_paragraphs[pid]['context'] # string
 
             # The following replacements are suggested in the paper
             # BidAF (Seo et al., 2016)
@@ -180,7 +180,7 @@ def preprocess_dataset(dataset):
             for qn in qas:
 
                 # read the question text and tokenize
-                question = unicode(qn['question']) # string
+                question = qn['question'] # string
                 question_tokens = tokenize(question) # list of strings
 
                 # also get the question_uuid
@@ -241,7 +241,7 @@ def generate_answers(session, model, word2id, qn_uuid_data, context_token_data, 
     data_size = len(qn_uuid_data)
     num_batches = ((data_size-1) / model.FLAGS.batch_size) + 1
     batch_num = 0
-    detokenizer = MosesDetokenizer()
+    #detokenizer = MosesDetokenizer()
 
     print("Generating answers...")
 
@@ -269,7 +269,9 @@ def generate_answers(session, model, word2id, qn_uuid_data, context_token_data, 
 
             # Detokenize and add to dict
             uuid = batch.uuids[ex_idx]
-            uuid2ans[uuid] = detokenizer.detokenize(pred_ans_tokens, return_str=True)
+            print(pred_ans_tokens)
+            uuid2ans[uuid] = "".join(pred_ans_tokens)
+            #uuid2ans[uuid] = detokenizer.detokenize(pred_ans_tokens, return_str=True)
 
         batch_num += 1
 

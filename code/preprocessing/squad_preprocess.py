@@ -19,10 +19,10 @@ import sys
 import random
 import argparse
 import json
-import nltk
 import numpy as np
 from tqdm import tqdm
 import importlib
+import jieba
 from six.moves.urllib.request import urlretrieve
 
 importlib.reload(sys)
@@ -50,7 +50,8 @@ def data_from_json(filename):
 
 
 def tokenize(sequence):
-    tokens = [token.replace("``", '"').replace("''", '"').lower() for token in nltk.word_tokenize(sequence)]
+    #tokens = [token.replace("``", '"').replace("''", '"').lower() for token in nltk.word_tokenize(sequence)]
+    tokens = [word for word in jieba.cut(sequence)]
     return tokens
 
 
@@ -261,14 +262,14 @@ def preprocess_and_write(dataset, tier, out_dir):
 def main():
     args = setup_args()
 
-    print("Will download SQuAD datasets to {}".format(args.data_dir))
-    print("Will put preprocessed SQuAD datasets in {}".format(args.data_dir))
+    #print("Will download SQuAD datasets to {}".format(args.data_dir))
+    #print("Will put preprocessed SQuAD datasets in {}".format(args.data_dir))
 
     if not os.path.exists(args.data_dir):
         os.makedirs(args.data_dir)
 
-    train_filename = "train-v1.1.json"
-    dev_filename = "dev-v1.1.json"
+    train_filename = "cmrc2018_train.json"
+    dev_filename = "cmrc2018_dev.json"
 
     # download train set
     #maybe_download(SQUAD_BASE_URL, train_filename, args.data_dir, 30288272)
