@@ -11,6 +11,7 @@ import os
 import sys
 import numpy as np
 import tensorflow as tf
+tf.compat.v1.disable_eager_execution()
 from tensorflow.python.ops import variable_scope as vs
 from tensorflow.python.ops import embedding_ops
 
@@ -21,7 +22,7 @@ from modules import RNNEncoder, SimpleSoftmaxLayer, SimpleSoftmaxLayerNew,BasicA
 
 logging.basicConfig(level=logging.INFO)
 
-from data_batcher import sentence_to_token_ids 
+from data_batcher import sentence_to_token_ids
 
 class PreQAModel(object):
 
@@ -29,8 +30,8 @@ class PreQAModel(object):
         self.emb_matrix=emb_matrix
         self.max_question_len=max_question_len
         self.word2id=word2id
-        self.new_qn_file_ids_tensor = tf.placeholder(tf.int32,shape=[None,self.max_question_len])
-        self.manual_qn_file_ids_tensor = tf.placeholder(tf.int32,shape=[None,self.max_question_len])
+        self.new_qn_file_ids_tensor = tf.compat.v1.placeholder(tf.compat.v1.int32,shape=[None,self.max_question_len])
+        self.manual_qn_file_ids_tensor = tf.compat.v1.placeholder(tf.compat.v1.int32,shape=[None,self.max_question_len])
         self.run_op = self.compare_questions_return()
 
     def compare_questions_preprocess(self,new_qn_file,manual_qn_file,manual_answer_file):
@@ -56,33 +57,33 @@ class PreQAModel(object):
 
     def compare_questions_return(self):
 
-        embedding_matrix = tf.constant(self.emb_matrix, dtype=tf.float32, name="emb_matrix") # shape (400002, embedding_size)
+        embedding_matrix = tf.compat.v1.constant(self.emb_matrix, dtype=tf.compat.v1.float32, name="emb_matrix") # shape (400002, embedding_size)
         qn_new_emb_print = embedding_ops.embedding_lookup(embedding_matrix, self.new_qn_file_ids_tensor) # shape (batch_size, question_len, embedding_size)
         qn_man_emb_print = embedding_ops.embedding_lookup(embedding_matrix, self.manual_qn_file_ids_tensor) # shape (batch_size, question_len, embedding_size)
 
-        qn_new_emb=tf.Print(qn_new_emb_print,[qn_new_emb_print])
-        qn_man_emb=tf.Print(qn_man_emb_print,[qn_man_emb_print])
+        qn_new_emb=tf.compat.v1.Print(qn_new_emb_print,[qn_new_emb_print])
+        qn_man_emb=tf.compat.v1.Print(qn_man_emb_print,[qn_man_emb_print])
         print("**************************************")
         print(qn_new_emb.get_shape().as_list())
         print(qn_man_emb.get_shape().as_list())
-        tile_tensor = tf.constant([8,1,1])
-        qn_new_emb_tile = tf.tile(qn_new_emb,tile_tensor)
+        tile_tensor = tf.compat.v1.constant([8,1,1])
+        qn_new_emb_tile = tf.compat.v1.tile(qn_new_emb,tile_tensor)
 
-        dot_product_cal = tf.multiply(qn_man_emb,qn_new_emb_tile)
-        reduce_sum = tf.reduce_sum(dot_product_cal,axis=2)
-        reduce_sum = tf.reduce_sum(reduce_sum,axis=1)
-        #reduce_sum_div = tf.reduce_sum(reduce_sum,axis=0)
-        #reduce_sum_div=tf.expand_dims(reduce_sum_div,axis=0)
-        #reduce_sum_div = tf.tile(reduce_sum_div,[8])
-        #reduce_sum = tf.divide(reduce_sum,reduce_sum_div)
-        #reduce_sum=tf.nn.softmax(reduce_sum)
+        dot_product_cal = tf.compat.v1.multiply(qn_man_emb,qn_new_emb_tile)
+        reduce_sum = tf.compat.v1.reduce_sum(dot_product_cal,axis=2)
+        reduce_sum = tf.compat.v1.reduce_sum(reduce_sum,axis=1)
+        #reduce_sum_div = tf.compat.v1.reduce_sum(reduce_sum,axis=0)
+        #reduce_sum_div=tf.compat.v1.expand_dims(reduce_sum_div,axis=0)
+        #reduce_sum_div = tf.compat.v1.tile(reduce_sum_div,[8])
+        #reduce_sum = tf.compat.v1.divide(reduce_sum,reduce_sum_div)
+        #reduce_sum=tf.compat.v1.nn.softmax(reduce_sum)
         return reduce_sum
 
     def compare_questions(self,new_qn_file,manual_qn_file,manual_answer_file):
 
         new_qn_file_ids,manual_qn_ids=self.compare_questions_preprocess(new_qn_file,manual_qn_file,manual_answer_file)
         reduce_sum_output=0
-        with tf.Session() as sess:
+        with tf.compat.v1.Session() as sess:
             input_feed={}
             input_feed[self.new_qn_file_ids_tensor]=new_qn_file_ids
             input_feed[self.manual_qn_file_ids_tensor]=manual_qn_ids
@@ -108,29 +109,30 @@ class QAModel(object):
         self.word2id = word2id
 
         # Add all parts of the graph
-        with tf.variable_scope("QAModel", initializer=tf.contrib.layers.variance_scaling_initializer(factor=1.0, uniform=True)):
+        with tf.compat.v1.variable_scope("QAModel",
+                                         initializer=tf.compat.v1.variance_scaling_initializer(), reuse=tf.compat.v1.AUTO_REUSE):
             self.add_placeholders()
             self.add_embedding_layer(emb_matrix)
             self.build_graph()
             self.add_loss()
 
-        # Define trainable parameters, gradient, gradient norm, and clip by gradient norm
-        params = tf.trainable_variables()
-        gradients = tf.gradients(self.loss, params)
-        self.gradient_norm = tf.global_norm(gradients)
-        clipped_gradients, _ = tf.clip_by_global_norm(gradients, FLAGS.max_gradient_norm)
-        self.param_norm = tf.global_norm(params)
+            # Define trainable parameters, gradient, gradient norm, and clip by gradient norm
+            params = tf.compat.v1.trainable_variables()
+            gradients = tf.compat.v1.gradients(self.loss, params)
+            self.gradient_norm = tf.compat.v1.global_norm(gradients)
+            clipped_gradients, _ = tf.compat.v1.clip_by_global_norm(gradients, FLAGS.max_gradient_norm)
+            self.param_norm = tf.compat.v1.global_norm(params)
 
-        # Define optimizer and updates
-        # (updates is what you need to fetch in session.run to do a gradient update)
-        self.global_step = tf.Variable(0, name="global_step", trainable=False)
-        opt = tf.train.AdamOptimizer(learning_rate=FLAGS.learning_rate) # you can try other optimizers
-        self.updates = opt.apply_gradients(zip(clipped_gradients, params), global_step=self.global_step)
+            # Define optimizer and updates
+            # (updates is what you need to fetch in session.run to do a gradient update)
+            self.global_step = tf.compat.v1.Variable(0, name="global_step", trainable=False)
+            opt = tf.compat.v1.train.AdamOptimizer(learning_rate=FLAGS.learning_rate) # you can try other optimizers
+            self.updates = opt.apply_gradients(zip(clipped_gradients, params), global_step=self.global_step)
 
-        # Define savers (for checkpointing) and summaries (for tensorboard)
-        self.saver = tf.train.Saver(tf.global_variables(), max_to_keep=FLAGS.keep)
-        self.bestmodel_saver = tf.train.Saver(tf.global_variables(), max_to_keep=1)
-        self.summaries = tf.summary.merge_all()
+            # Define savers (for checkpointing) and summaries (for tensorboard)
+            self.saver = tf.compat.v1.train.Saver(tf.compat.v1.global_variables(), max_to_keep=FLAGS.keep)
+            self.bestmodel_saver = tf.compat.v1.train.Saver(tf.compat.v1.global_variables(), max_to_keep=1)
+            self.summaries = tf.compat.v1.summary.merge_all()
 
 
     def add_placeholders(self):
@@ -140,15 +142,16 @@ class QAModel(object):
         # Add placeholders for inputs.
         # These are all batch-first: the None corresponds to batch_size and
         # allows you to run the same model with variable batch_size
-        self.context_ids = tf.placeholder(tf.int32, shape=[None, self.FLAGS.context_len])
-        self.context_mask = tf.placeholder(tf.int32, shape=[None, self.FLAGS.context_len])
-        self.qn_ids = tf.placeholder(tf.int32, shape=[None, self.FLAGS.question_len])
-        self.qn_mask = tf.placeholder(tf.int32, shape=[None, self.FLAGS.question_len])
-        self.ans_span = tf.placeholder(tf.int32, shape=[None, 2])
+        self.context_ids = tf.compat.v1.placeholder(tf.compat.v1.int32, shape=[None, self.FLAGS.context_len],
+                                                    name="context_ids")
+        self.context_mask = tf.compat.v1.placeholder(tf.compat.v1.int32, shape=[None, self.FLAGS.context_len], name="context_mask")
+        self.qn_ids = tf.compat.v1.placeholder(tf.compat.v1.int32, shape=[None, self.FLAGS.question_len], name="qn_ids")
+        self.qn_mask = tf.compat.v1.placeholder(tf.compat.v1.int32, shape=[None, self.FLAGS.question_len], name="qn_mask")
+        self.ans_span = tf.compat.v1.placeholder(tf.compat.v1.int32, shape=[None, 2], name="ans_span")
 
         # Add a placeholder to feed in the keep probability (for dropout).
         # This is necessary so that we can instruct the model to use dropout when training, but not when testing
-        self.keep_prob = tf.placeholder_with_default(1.0, shape=())
+        self.keep_prob = tf.compat.v1.placeholder_with_default(1.0, shape=(), name="keep_prob")
 
 
 
@@ -163,8 +166,8 @@ class QAModel(object):
         """
         with vs.variable_scope("embeddings"):
 
-            # Note: the embedding matrix is a tf.constant which means it's not a trainable parameter
-            embedding_matrix = tf.constant(emb_matrix, dtype=tf.float32, name="emb_matrix") # shape (400002, embedding_size)
+            # Note: the embedding matrix is a tf.compat.v1.constant which means it's not a trainable parameter
+            embedding_matrix = tf.compat.v1.constant(emb_matrix, dtype=tf.compat.v1.float32, name="emb_matrix") # shape (400002, embedding_size)
 
             # Get the word embeddings for the context and question,
             # using the placeholders self.context_ids and self.qn_ids
@@ -174,44 +177,44 @@ class QAModel(object):
 
     def matching_function(self,Tilda,Normal,name,NormalShape):                  #For the Mathcing ('m' function in Fusion function)
 
-        matrix_dimensions = tf.shape(Normal)
+        matrix_dimensions = tf.compat.v1.shape(Normal)
         batch_size,matrix_size,hidden_size = matrix_dimensions[0],matrix_dimensions[1],matrix_dimensions[2]
 
 
-        Wf = tf.get_variable(name,shape=[NormalShape.get_shape().as_list()[1],4*NormalShape.get_shape().as_list()[1]],trainable=True)
-        tf.summary.histogram("weightsGating"+name, Wf)
+        Wf = tf.compat.v1.get_variable(name,shape=[NormalShape.get_shape().as_list()[1],4*NormalShape.get_shape().as_list()[1]],trainable=True)
+        tf.compat.v1.summary.histogram("weightsGating"+name, Wf)
 
 
-        #WfReshape = tf.transpose(Wf,perm=[1,0,2])
+        #WfReshape = tf.compat.v1.transpose(Wf,perm=[1,0,2])
 
         nameBias = name+"bias"
-        Bias = tf.get_variable(nameBias,shape=[1],trainable=True)
-        tf.summary.histogram("Bias"+name, Bias)
+        Bias = tf.compat.v1.get_variable(nameBias,shape=[1],trainable=True)
+        tf.compat.v1.summary.histogram("Bias"+name, Bias)
 
-        ElementWiseProduct = tf.multiply(Tilda,Normal)     #(batch,paragraph,hidden*2)
+        ElementWiseProduct = tf.compat.v1.multiply(Tilda,Normal)     #(batch,paragraph,hidden*2)
 
-        #ElementWiseProduct = tf.reshape(ElementWiseProductTemp,[batch_size,matrix_size,hidden_size])
+        #ElementWiseProduct = tf.compat.v1.reshape(ElementWiseProductTemp,[batch_size,matrix_size,hidden_size])
 
-        SubtractMatrix = tf.subtract(Normal,Tilda)
+        SubtractMatrix = tf.compat.v1.subtract(Normal,Tilda)
 
-        ConcatMatrix = tf.concat([tf.concat([tf.concat([Normal,Tilda],0),ElementWiseProduct],0),SubtractMatrix],0) #(batch,4*paragraph,hidden*2)
+        ConcatMatrix = tf.compat.v1.concat([tf.compat.v1.concat([tf.compat.v1.concat([Normal,Tilda],0),ElementWiseProduct],0),SubtractMatrix],0) #(batch,4*paragraph,hidden*2)
 
-        
+
         print(Normal.get_shape().as_list())
         print(ConcatMatrix.get_shape().as_list())
 
 
 
-        ConcatMatrixReshape = tf.reshape(tf.transpose(ConcatMatrix,perm=[1,0,2]),[4*matrix_size,batch_size*hidden_size])    #(4P,H*B)
+        ConcatMatrixReshape = tf.compat.v1.reshape(tf.compat.v1.transpose(ConcatMatrix,perm=[1,0,2]),[4*matrix_size,batch_size*hidden_size])    #(4P,H*B)
 
 
-        Matching1 = tf.matmul(Wf,ConcatMatrixReshape)   #(P,H*B)
+        Matching1 = tf.compat.v1.matmul(Wf,ConcatMatrixReshape)   #(P,H*B)
 
-        Matching2_new = tf.reshape(Matching1,[matrix_size,batch_size,hidden_size])  #(P,B,H)
-        Matching2_transpose = tf.transpose(Matching2_new,perm=[1,0,2]) #(B,P,H)
-        addBias = tf.add(Matching2_transpose,Bias)
+        Matching2_new = tf.compat.v1.reshape(Matching1,[matrix_size,batch_size,hidden_size])  #(P,B,H)
+        Matching2_transpose = tf.compat.v1.transpose(Matching2_new,perm=[1,0,2]) #(B,P,H)
+        addBias = tf.compat.v1.add(Matching2_transpose,Bias)
 
-        matchingOutput = tf.nn.tanh(addBias)
+        matchingOutput = tf.compat.v1.nn.tanh(addBias)
 
         return matchingOutput
 
@@ -220,26 +223,26 @@ class QAModel(object):
         matchingOutput = None
         with vs.variable_scope(name+"SCOPE"):
 
-            matrix_dimensions = tf.shape(Normal)
+            matrix_dimensions = tf.compat.v1.shape(Normal)
             batch_size,matrix_size,hidden_size = matrix_dimensions[0],matrix_dimensions[1],matrix_dimensions[2]
 
 
-            Wf = tf.get_variable(name,shape=[NormalShape.get_shape().as_list()[1],4*NormalShape.get_shape().as_list()[1]],trainable=True)
-            tf.summary.histogram("weightsGating"+name, Wf)
+            Wf = tf.compat.v1.get_variable(name,shape=[NormalShape.get_shape().as_list()[1],4*NormalShape.get_shape().as_list()[1]],trainable=True)
+            tf.compat.v1.summary.histogram("weightsGating"+name, Wf)
 
 
-            #WfReshape = tf.transpose(Wf,perm=[1,0,2])
+            #WfReshape = tf.compat.v1.transpose(Wf,perm=[1,0,2])
 
             nameBias = name+"bias"
-            Bias = tf.get_variable(nameBias,shape=[1],trainable=True)
-            tf.summary.histogram("Bias"+name, Bias)
-            ElementWiseProduct = tf.multiply(Tilda,Normal)     #(batch,paragraph,hidden*2)
+            Bias = tf.compat.v1.get_variable(nameBias,shape=[1],trainable=True)
+            tf.compat.v1.summary.histogram("Bias"+name, Bias)
+            ElementWiseProduct = tf.compat.v1.multiply(Tilda,Normal)     #(batch,paragraph,hidden*2)
 
-            #ElementWiseProduct = tf.reshape(ElementWiseProductTemp,[batch_size,matrix_size,hidden_size])
+            #ElementWiseProduct = tf.compat.v1.reshape(ElementWiseProductTemp,[batch_size,matrix_size,hidden_size])
 
-            SubtractMatrix = tf.subtract(Normal,Tilda)
+            SubtractMatrix = tf.compat.v1.subtract(Normal,Tilda)
 
-            ConcatMatrix = tf.concat([tf.concat([tf.concat([Normal,Tilda],0),ElementWiseProduct],0),SubtractMatrix],0) #(batch,4*paragraph,hidden*2)
+            ConcatMatrix = tf.compat.v1.concat([tf.compat.v1.concat([tf.compat.v1.concat([Normal,Tilda],0),ElementWiseProduct],0),SubtractMatrix],0) #(batch,4*paragraph,hidden*2)
 
 
             print(Normal.get_shape().as_list())
@@ -248,20 +251,20 @@ class QAModel(object):
 
 
 
-        ConcatMatrixReshape = tf.reshape(tf.transpose(ConcatMatrix,perm=[1,0,2]),[4*matrix_size,batch_size*hidden_size])    #(4P,H*B)
+        ConcatMatrixReshape = tf.compat.v1.reshape(tf.compat.v1.transpose(ConcatMatrix,perm=[1,0,2]),[4*matrix_size,batch_size*hidden_size])    #(4P,H*B)
 
 
-        Matching1 = tf.matmul(Wf,ConcatMatrixReshape)   #(P,H*B)
+        Matching1 = tf.compat.v1.matmul(Wf,ConcatMatrixReshape)   #(P,H*B)
 
-        Matching2_new = tf.reshape(Matching1,[matrix_size,batch_size,hidden_size])  #(P,B,H)
-        Matching2_transpose = tf.transpose(Matching2_new,perm=[1,0,2]) #(B,P,H)
-        addBias = tf.add(Matching2_transpose,Bias)
+        Matching2_new = tf.compat.v1.reshape(Matching1,[matrix_size,batch_size,hidden_size])  #(P,B,H)
+        Matching2_transpose = tf.compat.v1.transpose(Matching2_new,perm=[1,0,2]) #(B,P,H)
+        addBias = tf.compat.v1.add(Matching2_transpose,Bias)
 
-        matchingOutput = tf.nn.sigmoid(addBias)
+        matchingOutput = tf.compat.v1.nn.sigmoid(addBias)
 
         return matchingOutput
 
-       
+
 
 
 
@@ -273,10 +276,10 @@ class QAModel(object):
         print(matchingOutput.get_shape().as_list())
         ##time.sleep(100)
 
-        returnNewTildaPart1 = tf.multiply(gatingOutput,matchingOutput)
-        returnNewTildaPart2 = tf.multiply(gatingOutput,tf.subtract(1.00,matchingOutput))
+        returnNewTildaPart1 = tf.compat.v1.multiply(gatingOutput,matchingOutput)
+        returnNewTildaPart2 = tf.compat.v1.multiply(gatingOutput,tf.compat.v1.subtract(1.00,matchingOutput))
 
-        returnNewTilda = tf.add(returnNewTildaPart1,returnNewTildaPart2)
+        returnNewTilda = tf.compat.v1.add(returnNewTildaPart1,returnNewTildaPart2)
 
 
         return returnNewTilda
@@ -288,23 +291,23 @@ class QAModel(object):
 
         print("shape new",Normal.get_shape().as_list())
         #####time.sleep(10)
-        matrix_dimensions = tf.shape(Normal)
+        matrix_dimensions = tf.compat.v1.shape(Normal)
         batch_size,matrix_size,hidden_size = matrix_dimensions[0],matrix_dimensions[1],matrix_dimensions[2]
 
 
         print(matrix_size)
         print(name)
         #####time.sleep(15)
-        Wf = tf.get_variable(name,shape=[4*NormalShape.get_shape().as_list()[1],1])
+        Wf = tf.compat.v1.get_variable(name,shape=[4*NormalShape.get_shape().as_list()[1],1])
 
         nameBias = name+"bias"
-        Bias = tf.get_variable(nameBias,shape=[1])
+        Bias = tf.compat.v1.get_variable(nameBias,shape=[1])
 
-        ElementWiseProduct = tf.multiply(Tilda,Normal)
+        ElementWiseProduct = tf.compat.v1.multiply(Tilda,Normal)
 
-        SubtractMatrix = tf.subtract(Normal,Tilda)
+        SubtractMatrix = tf.compat.v1.subtract(Normal,Tilda)
 
-        ConcatMatrix = tf.concat([tf.concat([tf.concat([Normal,Tilda],1),ElementWiseProduct],1),SubtractMatrix],1) #(batch,4*paragraph,hidden*2)
+        ConcatMatrix = tf.compat.v1.concat([tf.compat.v1.concat([tf.compat.v1.concat([Normal,Tilda],1),ElementWiseProduct],1),SubtractMatrix],1) #(batch,4*paragraph,hidden*2)
 
         print(Normal.get_shape().as_list())
         print(Tilda.get_shape().as_list())
@@ -314,19 +317,19 @@ class QAModel(object):
 
 
 
-        ConcatMatrixReshape = tf.reshape(tf.transpose(ConcatMatrix,perm=[1,0,2]),[4*matrix_size,batch_size*hidden_size])
+        ConcatMatrixReshape = tf.compat.v1.reshape(tf.compat.v1.transpose(ConcatMatrix,perm=[1,0,2]),[4*matrix_size,batch_size*hidden_size])
 
-        Matching1 = tf.matmul(tf.transpose(Wf,perm=[1,0]),ConcatMatrixReshape)
+        Matching1 = tf.compat.v1.matmul(tf.compat.v1.transpose(Wf,perm=[1,0]),ConcatMatrixReshape)
 
         print(Matching1.get_shape().as_list())
 
-        Matching2 = tf.reshape(Matching1,[batch_size,1,hidden_size])
+        Matching2 = tf.compat.v1.reshape(Matching1,[batch_size,1,hidden_size])
 
 
-        addBias = tf.add(Matching2,Bias)
+        addBias = tf.compat.v1.add(Matching2,Bias)
 
 
-        gatingOutput = tf.nn.sigmoid(addBias)
+        gatingOutput = tf.compat.v1.nn.sigmoid(addBias)
 
         return gatingOutput
 
@@ -339,22 +342,21 @@ class QAModel(object):
         print(matchingOutput.get_shape().as_list())
         ####time.sleep(10)
 
-        returnNewTildaPart1 = tf.matmul(matchingOutput,tf.transpose(gatingOutput,perm=[0,2,1]))
+        returnNewTildaPart1 = tf.compat.v1.matmul(matchingOutput,tf.compat.v1.transpose(gatingOutput,perm=[0,2,1]))
 
-        returnNewTildaPart2 = tf.matmul(matchingOutput,tf.transpose(tf.subtract(1.00,gatingOutput),perm=[0,2,1]))
+        returnNewTildaPart2 = tf.compat.v1.matmul(matchingOutput,tf.compat.v1.transpose(tf.compat.v1.subtract(1.00,gatingOutput),perm=[0,2,1]))
 
-        returnNewTilda = tf.add(returnNewTildaPart1,returnNewTildaPart2)
+        returnNewTilda = tf.compat.v1.add(returnNewTildaPart1,returnNewTildaPart2)
 
         return returnNewTilda
 
-        #returnNewTildaPart1 = tf.matmul(matching_function(Tilda,Normal,name1),tf.transpose(gating_function(Tilda,Normal,name2),perm=[0,2,1]))
-        #returnNewTildaPart2 = tf.matmul(Normal,tf.subtract(1,gating_function(Tilda,Normal,name)))
+        #returnNewTildaPart1 = tf.compat.v1.matmul(matching_function(Tilda,Normal,name1),tf.compat.v1.transpose(gating_function(Tilda,Normal,name2),perm=[0,2,1]))
+        #returnNewTildaPart2 = tf.compat.v1.matmul(Normal,tf.compat.v1.subtract(1,gating_function(Tilda,Normal,name)))
         '''
 
 
     def build_graph_middle(self,new_attn,attn_output,context_hiddens,question_hiddens):
 
-        
 
         matrix_dimensions_answer = context_hiddens.get_shape().as_list()
         batch_size_answer,matrix_size_answer,hidden_size_answer = matrix_dimensions_answer[0],matrix_dimensions_answer[1],matrix_dimensions_answer[2]
@@ -378,17 +380,17 @@ class QAModel(object):
         print("attention matrix",new_attn.get_shape().as_list())
 
 
-        P2Q = tf.nn.softmax(new_attn,1)   #(batch,paragraph,questions)
+        P2Q = tf.compat.v1.nn.softmax(new_attn,1)   #(batch,paragraph,questions)
 
-        QTilda = tf.matmul(P2Q,question_hiddens)        #(batch,paragraph,hidden*2) same as paragraph
+        QTilda = tf.compat.v1.matmul(P2Q,question_hiddens)        #(batch,paragraph,hidden*2) same as paragraph
 
 
 
-        Q2P = tf.nn.softmax(new_attn,2)
+        Q2P = tf.compat.v1.nn.softmax(new_attn,2)
 
-        Q2PTranspose = tf.transpose(Q2P,perm=[0,2,1])
+        Q2PTranspose = tf.compat.v1.transpose(Q2P,perm=[0,2,1])
 
-        PTilda = tf.matmul(Q2PTranspose,context_hiddens)        #(batch,question,hidden*2) same as question
+        PTilda = tf.compat.v1.matmul(Q2PTranspose,context_hiddens)        #(batch,question,hidden*2) same as question
 
 
         print("P2Q",P2Q.get_shape().as_list())
@@ -411,8 +413,8 @@ class QAModel(object):
         questionNew.set_shape([None,matrix_size_question,hidden_size_question])
         ##time.sleep(100)
 
-        #paragraphNew = tf.Print(paragraphNew,[tf.shape(paragraphNew)])
-        #questionNew = tf.Print(questionNew,[tf.shape(questionNew)])
+        #paragraphNew = tf.compat.v1.Print(paragraphNew,[tf.compat.v1.shape(paragraphNew)])
+        #questionNew = tf.compat.v1.Print(questionNew,[tf.compat.v1.shape(questionNew)])
 
 
 
@@ -422,8 +424,8 @@ class QAModel(object):
         ##time.sleep(100)
 
 
-        #paragraphNewMask  = tf.placeholder(tf.int32, shape=[None, 1])
-        #questionNewMask  = tf.placeholder(tf.int32, shape=[None, 1])
+        #paragraphNewMask  = tf.compat.v1.placeholder(tf.compat.v1.int32, shape=[None, 1])
+        #questionNewMask  = tf.compat.v1.placeholder(tf.compat.v1.int32, shape=[None, 1])
 
         encoder2 = RNNEncoder(self.FLAGS.hidden_size, self.keep_prob)
         encoder2Q = RNNEncoder(self.FLAGS.hidden_size, self.keep_prob)
@@ -434,14 +436,14 @@ class QAModel(object):
         #context_hiddens_new = paragraphNew
         #question_hiddens_new = questionNew
 
-        #context_hiddens_new = tf.Print(context_hiddens_new,[tf.shape(context_hiddens_new)])
-        #question_hiddens_new = tf.Print(question_hiddens_new,[tf.shape(question_hiddens_new)])
+        #context_hiddens_new = tf.compat.v1.Print(context_hiddens_new,[tf.compat.v1.shape(context_hiddens_new)])
+        #question_hiddens_new = tf.compat.v1.Print(question_hiddens_new,[tf.compat.v1.shape(question_hiddens_new)])
 
 
         print(context_hiddens_new.get_shape().as_list())
         print("****")
         ####time.sleep(100)
-        matrix_dimensions = tf.shape(context_hiddens)
+        matrix_dimensions = tf.compat.v1.shape(context_hiddens)
         batch_size,matrix_size,hidden_size = matrix_dimensions[0],matrix_dimensions[1],matrix_dimensions[2]
 
 
@@ -451,47 +453,47 @@ class QAModel(object):
 
 
 
-        W1 = tf.get_variable("W1",shape=[matrix_size_answer,matrix_size_answer],trainable=True) #(matrix_size,matrix_size)
+        W1 = tf.compat.v1.get_variable("W1",shape=[matrix_size_answer,matrix_size_answer],trainable=True) #(matrix_size,matrix_size)
 
 
-        #paragraphNewReshape = tf.reshape(context_hiddens_new,[batch_size*matrix_size,hidden_size])
-        paragraphNewTranspose = tf.transpose(context_hiddens_new,perm=[0,2,1])
-        paragraphNewReshape = tf.reshape(paragraphNewTranspose,[batch_size*hidden_size,matrix_size])    #(B*H,P)
+        #paragraphNewReshape = tf.compat.v1.reshape(context_hiddens_new,[batch_size*matrix_size,hidden_size])
+        paragraphNewTranspose = tf.compat.v1.transpose(context_hiddens_new,perm=[0,2,1])
+        paragraphNewReshape = tf.compat.v1.reshape(paragraphNewTranspose,[batch_size*hidden_size,matrix_size])    #(B*H,P)
 
-        paragraphTempRep = tf.matmul(paragraphNewReshape,W1)                                            #(B*H,P)
+        paragraphTempRep = tf.compat.v1.matmul(paragraphNewReshape,W1)                                            #(B*H,P)
 
-        paragraphTempRep2 = tf.reshape(paragraphTempRep,[batch_size,hidden_size,matrix_size])
-        paragraphTempRep3 = tf.matmul(paragraphTempRep2,context_hiddens_new)
-        paragraphTempSoftmax = tf.nn.softmax(paragraphTempRep3)                             #(batch,hidden_size,hidden_size)
+        paragraphTempRep2 = tf.compat.v1.reshape(paragraphTempRep,[batch_size,hidden_size,matrix_size])
+        paragraphTempRep3 = tf.compat.v1.matmul(paragraphTempRep2,context_hiddens_new)
+        paragraphTempSoftmax = tf.compat.v1.nn.softmax(paragraphTempRep3)                             #(batch,hidden_size,hidden_size)
 
-        paragraphSelfAllign = tf.matmul(paragraphTempSoftmax,tf.transpose(context_hiddens_new,perm=[0,2,1]))
+        paragraphSelfAllign = tf.compat.v1.matmul(paragraphTempSoftmax,tf.compat.v1.transpose(context_hiddens_new,perm=[0,2,1]))
 
-        paragraphContextual = self.Fuse(tf.transpose(paragraphSelfAllign,perm=[0,2,1]),context_hiddens_new,"paragraphGate2","paragraphMatch2",context_hiddens) #(batch,pargraph,hidden)
+        paragraphContextual = self.Fuse(tf.compat.v1.transpose(paragraphSelfAllign,perm=[0,2,1]),context_hiddens_new,"paragraphGate2","paragraphMatch2",context_hiddens) #(batch,pargraph,hidden)
 
 
         print(paragraphContextual.get_shape().as_list())
         #time.sleep(100)
 
-        #paragraphContextual = tf.Print(paragraphContextual,[tf.shape(paragraphContextual)])
+        #paragraphContextual = tf.compat.v1.Print(paragraphContextual,[tf.compat.v1.shape(paragraphContextual)])
 
 
         '''
         batch_size2,matrix_size2,hidden_size2 = matrix_dimensions2[0],matrix_dimensions2[1],matrix_dimensions2[2]
-        matrix_dimensions2 = tf.shape(context_hiddens_new)
-        questionNewReshape = tf.reshape(question_hiddens_new,[batch_size2*matrix_size2,hidden_size2])
-        questionTempRep = tf.matmul(tf.matmul(questionNewReshape,W1))
-        questionTempRep2 = tf.reshape(questionTempRep,[batch_size2,matrix_size2,hidden_size2])
-        questionTempRep3 = tf.matmul(questionTempRep2,tf.transpose(question_hiddens_new,dim=[0,2,1]))
-        questionTempSoftmax = tf.nn.softmax(questionTempRep3)
+        matrix_dimensions2 = tf.compat.v1.shape(context_hiddens_new)
+        questionNewReshape = tf.compat.v1.reshape(question_hiddens_new,[batch_size2*matrix_size2,hidden_size2])
+        questionTempRep = tf.compat.v1.matmul(tf.compat.v1.matmul(questionNewReshape,W1))
+        questionTempRep2 = tf.compat.v1.reshape(questionTempRep,[batch_size2,matrix_size2,hidden_size2])
+        questionTempRep3 = tf.compat.v1.matmul(questionTempRep2,tf.compat.v1.transpose(question_hiddens_new,dim=[0,2,1]))
+        questionTempSoftmax = tf.compat.v1.nn.softmax(questionTempRep3)
 
-        questionSelfAllign = tf.matmul(questionTempSoftmax,question_hiddens_new)
+        questionSelfAllign = tf.compat.v1.matmul(questionTempSoftmax,question_hiddens_new)
         '''
 
         encoder3 = RNNEncoder(self.FLAGS.hidden_size, self.keep_prob)
 
 
 
-        #pargraphContextualMask =  tf.placeholder(tf.int32, shape=[None, self.FLAGS.context_len])
+        #pargraphContextualMask =  tf.compat.v1.placeholder(tf.compat.v1.int32, shape=[None, self.FLAGS.context_len])
         paragraphContextual.set_shape([batch_size_answer,matrix_size_answer,hidden_size_answer])
 
         print(batch_size_answer,matrix_size_answer,hidden_size_answer)
@@ -503,55 +505,55 @@ class QAModel(object):
 
 
         #Code to represent question
-        matrix_dimensions2 = tf.shape(question_hiddens)
+        matrix_dimensions2 = tf.compat.v1.shape(question_hiddens)
         batch_size2,matrix_size2,hidden_size2 = matrix_dimensions2[0],matrix_dimensions2[1],matrix_dimensions2[2]
 
 
 
         #encoder4 = RNNEncoder(self.FLAGS.hidden_size, self.keep_prob)
-        #questionSelfAllignMask =  tf.placeholder(tf.int32, shape=[None, self.FLAGS.question_len])
+        #questionSelfAllignMask =  tf.compat.v1.placeholder(tf.compat.v1.int32, shape=[None, self.FLAGS.question_len])
         questionSelfAllign = question_hiddens_new
         #encoder4.build_graph(question_hiddens_new, self.qn_mask,"rnnencoder4")  #(batch,question,H)
 
 
-        Wq = tf.get_variable("Wq",shape=[1,question_hiddens.get_shape().as_list()[2]],trainable=True)      #(1,h)
+        Wq = tf.compat.v1.get_variable("Wq",shape=[1,question_hiddens.get_shape().as_list()[2]],trainable=True)      #(1,h)
 
-        questionSelfAllignTranspose = tf.transpose(questionSelfAllign,perm=[2,0,1])
-        questionSelfAllignReshape = tf.reshape(questionSelfAllignTranspose,[hidden_size2,matrix_size2*batch_size2])
+        questionSelfAllignTranspose = tf.compat.v1.transpose(questionSelfAllign,perm=[2,0,1])
+        questionSelfAllignReshape = tf.compat.v1.reshape(questionSelfAllignTranspose,[hidden_size2,matrix_size2*batch_size2])
 
-        GammaTemp = tf.matmul(Wq,questionSelfAllignReshape)
-        GammaTemp2 = tf.reshape(GammaTemp,[batch_size2,1,matrix_size2])
-        Gamma = tf.nn.softmax(GammaTemp2)      #(batch,1,question)
+        GammaTemp = tf.compat.v1.matmul(Wq,questionSelfAllignReshape)
+        GammaTemp2 = tf.compat.v1.reshape(GammaTemp,[batch_size2,1,matrix_size2])
+        Gamma = tf.compat.v1.nn.softmax(GammaTemp2)      #(batch,1,question)
 
-        questionContextual = tf.matmul(Gamma,questionSelfAllign)    #(batch,1,hidden)
+        questionContextual = tf.compat.v1.matmul(Gamma,questionSelfAllign)    #(batch,1,hidden)
 
         print(questionContextual.get_shape().as_list())
         ###time.sleep(100)
 
         #For start point of answer
-        WeightSoftmaxStart = tf.get_variable("WeightSoftmaxStart",[question_hiddens.get_shape().as_list()[2],question_hiddens.get_shape().as_list()[2]],trainable=True)
-        questionTranspose = tf.transpose(questionContextual,perm=[0,2,1])
-        questionContextualReshape = tf.reshape(questionTranspose,[batch_size,hidden_size])
-        tempMatrixMult1 = tf.matmul(questionContextualReshape,WeightSoftmaxStart)
+        WeightSoftmaxStart = tf.compat.v1.get_variable("WeightSoftmaxStart",[question_hiddens.get_shape().as_list()[2],question_hiddens.get_shape().as_list()[2]],trainable=True)
+        questionTranspose = tf.compat.v1.transpose(questionContextual,perm=[0,2,1])
+        questionContextualReshape = tf.compat.v1.reshape(questionTranspose,[batch_size,hidden_size])
+        tempMatrixMult1 = tf.compat.v1.matmul(questionContextualReshape,WeightSoftmaxStart)
 
-        tempMatrixMult1Reshape = tf.reshape(tempMatrixMult1,[batch_size,1,hidden_size])
-        probStartMatrix = tf.matmul(tempMatrixMult1Reshape,tf.transpose(paragraphContextual,perm=[0,2,1]))  #(b,1,n)
+        tempMatrixMult1Reshape = tf.compat.v1.reshape(tempMatrixMult1,[batch_size,1,hidden_size])
+        probStartMatrix = tf.compat.v1.matmul(tempMatrixMult1Reshape,tf.compat.v1.transpose(paragraphContextual,perm=[0,2,1]))  #(b,1,n)
         '''
-        paragraphContextualTranspose = tf.reshape(paragraphContextual,[batch_size*matrix_size,hidden_size])
+        paragraphContextualTranspose = tf.compat.v1.reshape(paragraphContextual,[batch_size*matrix_size,hidden_size])
 
-        tempMatrixMult1 = tf.matmul(paragraphContextualTranspose,WeightSoftmaxStart)
-        tempMatrixMult1Reshape = tf.reshape(tempMatrixMult1,[batch_size,matrix_size,1])
+        tempMatrixMult1 = tf.compat.v1.matmul(paragraphContextualTranspose,WeightSoftmaxStart)
+        tempMatrixMult1Reshape = tf.compat.v1.reshape(tempMatrixMult1,[batch_size,matrix_size,1])
 
-        probStartMatrix = tf.matmul(tempMatrixMult1Reshape,questionContextual) #(batch,pargraph,context)
+        probStartMatrix = tf.compat.v1.matmul(tempMatrixMult1Reshape,questionContextual) #(batch,pargraph,context)
         '''
 
         #For end point of answer
-        WeightSoftmaxEnd = tf.get_variable("WeightSoftmaxEnd",[question_hiddens.get_shape().as_list()[2],question_hiddens.get_shape().as_list()[2]],trainable=True)
-        #questionTranspose = tf.transpose(questionContextual,perm=[0,2,1])
-        #questionContextualReshape = tf.reshape(questionTranspose,[batch_size,hidden_size])
-        tempMatrixMult2 = tf.matmul(questionContextualReshape,WeightSoftmaxEnd)
-        tempMatrixMult1Reshape2 = tf.reshape(tempMatrixMult2,[batch_size,1,hidden_size])
-        probEndMatrix = tf.matmul(tempMatrixMult1Reshape2,tf.transpose(paragraphContextual,perm=[0,2,1])) #(b,1,n)
+        WeightSoftmaxEnd = tf.compat.v1.get_variable("WeightSoftmaxEnd",[question_hiddens.get_shape().as_list()[2],question_hiddens.get_shape().as_list()[2]],trainable=True)
+        #questionTranspose = tf.compat.v1.transpose(questionContextual,perm=[0,2,1])
+        #questionContextualReshape = tf.compat.v1.reshape(questionTranspose,[batch_size,hidden_size])
+        tempMatrixMult2 = tf.compat.v1.matmul(questionContextualReshape,WeightSoftmaxEnd)
+        tempMatrixMult1Reshape2 = tf.compat.v1.reshape(tempMatrixMult2,[batch_size,1,hidden_size])
+        probEndMatrix = tf.compat.v1.matmul(tempMatrixMult1Reshape2,tf.compat.v1.transpose(paragraphContextual,perm=[0,2,1])) #(b,1,n)
 
 
         print(probStartMatrix.get_shape().as_list())
@@ -559,23 +561,23 @@ class QAModel(object):
         print("**************")
 
 
-        probStartMatrix = tf.reshape(probStartMatrix,[batch_size,matrix_size])
-        probEndMatrix = tf.reshape(probEndMatrix,[batch_size,matrix_size])
+        probStartMatrix = tf.compat.v1.reshape(probStartMatrix,[batch_size,matrix_size])
+        probEndMatrix = tf.compat.v1.reshape(probEndMatrix,[batch_size,matrix_size])
 
         # Concat attn_output to context_hiddens to get blended_reps
-        blended_reps = tf.concat([context_hiddens, attn_output], axis=2) # (batch_size, context_len, hidden_size*4)
+        blended_reps = tf.compat.v1.concat([context_hiddens, attn_output], axis=2) # (batch_size, context_len, hidden_size*4)
 
         # Apply fully connected layer to each blended representation
         # Note, blended_reps_final corresponds to b' in the handout
-        # Note, tf.contrib.layers.fully_connected applies a ReLU non-linarity here by default
-        blended_reps_final = tf.contrib.layers.fully_connected(blended_reps, num_outputs=self.FLAGS.hidden_size) # blended_reps_final is shape (batch_size, context_len, hidden_size)
+        # Note, tf.compat.v1.contrib.layers.fully_connected applies a ReLU non-linarity here by default
+        blended_reps_final = tf.compat.v1.layers.dense(blended_reps, self.FLAGS.hidden_size) # blended_reps_final is shape (batch_size, context_len, hidden_size)
 
-        
+
         return probStartMatrix,probEndMatrix,blended_reps_final
-        
 
 
-        
+
+
 
 
     def build_graph(self):
@@ -602,7 +604,7 @@ class QAModel(object):
         attn_layer = BasicAttn(self.keep_prob, self.FLAGS.hidden_size*2, self.FLAGS.hidden_size*2)
         _, attn_output,new_attn = attn_layer.build_graph(question_hiddens, self.qn_mask, context_hiddens,2*self.FLAGS.hidden_size) # attn_output is shape (batch_size, context_len, hidden_size*2)
 
-        _,_,blended_reps_final=build_graph_middle(self,new_attn,attn_output,context_hiddens,question_hiddens)
+        _,_,blended_reps_final=self.build_graph_middle(new_attn,attn_output,context_hiddens,question_hiddens)
 
         # Use softmax layer to compute probability distribution for start location
         # Note this produces self.logits_start and self.probdist_start, both of which have shape (batch_size, context_len)
@@ -616,7 +618,7 @@ class QAModel(object):
             softmax_layer_end = SimpleSoftmaxLayer()
             self.logits_end, self.probdist_end = softmax_layer_end.build_graph(blended_reps_final, self.context_mask)
 
-        
+
 
         '''
         
@@ -628,7 +630,7 @@ class QAModel(object):
         Uses:
           self.logits_start: shape (batch_size, context_len)
             IMPORTANT: Assumes that self.logits_start is masked (i.e. has -large in masked locations).
-            That's because the tf.nn.sparse_softmax_cross_entropy_with_logits
+            That's because the tf.compat.v1.nn.sparse_softmax_cross_entropy_with_logits
             function applies softmax and then computes cross-entropy loss.
             So you need to apply masking to the logits (by subtracting large
             number in the padding location) BEFORE you pass to the
@@ -643,18 +645,18 @@ class QAModel(object):
         with vs.variable_scope("loss"):
 
             # Calculate loss for prediction of start position
-            loss_start = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=self.logits_start, labels=self.ans_span[:, 0]) # loss_start has shape (batch_size)
-            self.loss_start = tf.reduce_mean(loss_start) # scalar. avg across batch
-            tf.summary.scalar('loss_start', self.loss_start) # log to tensorboard
+            loss_start = tf.compat.v1.nn.sparse_softmax_cross_entropy_with_logits(logits=self.logits_start, labels=self.ans_span[:, 0]) # loss_start has shape (batch_size)
+            self.loss_start = tf.compat.v1.reduce_mean(loss_start) # scalar. avg across batch
+            tf.compat.v1.summary.scalar('loss_start', self.loss_start) # log to tensorboard
 
             # Calculate loss for prediction of end position
-            loss_end = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=self.logits_end, labels=self.ans_span[:, 1])
-            self.loss_end = tf.reduce_mean(loss_end)
-            tf.summary.scalar('loss_end', self.loss_end)
+            loss_end = tf.compat.v1.nn.sparse_softmax_cross_entropy_with_logits(logits=self.logits_end, labels=self.ans_span[:, 1])
+            self.loss_end = tf.compat.v1.reduce_mean(loss_end)
+            tf.compat.v1.summary.scalar('loss_end', self.loss_end)
 
             # Add the two losses
             self.loss = self.loss_start + self.loss_end
-            tf.summary.scalar('loss', self.loss)
+            tf.compat.v1.summary.scalar('loss', self.loss)
 
 
     def run_train_iter(self, session, batch, summary_writer):
@@ -686,15 +688,13 @@ class QAModel(object):
         #print(batch.ans_span)
         input_feed[self.keep_prob] = 1.0 - self.FLAGS.dropout # apply dropout
 
-        
-        # print(len(input_feed))
         # output_feed contains the things we want to fetch.
         output_feed = [self.updates, self.summaries, self.loss, self.global_step, self.param_norm, self.gradient_norm]
 
         # Run the model
         #print(session.run(output_feed, input_feed))
-        session.run(tf.global_variables_initializer())
-        [_, summaries, loss, global_step, param_norm, gradient_norm] = session.run(output_feed, input_feed,run_metadata=None)
+        session.run(tf.compat.v1.global_variables_initializer())
+        [_, summaries, loss, global_step, param_norm, gradient_norm] = session.run(output_feed, feed_dict=input_feed)
 
         # All summaries in the graph are added to Tensorboard
         summary_writer.add_summary(summaries, global_step)
@@ -746,7 +746,7 @@ class QAModel(object):
         input_feed[self.qn_ids] = batch.qn_ids
         input_feed[self.qn_mask] = batch.qn_mask
         # note you don't supply keep_prob here, so it will default to 1 i.e. no dropout
-        session.run(tf.global_variables_initializer())
+        session.run(tf.compat.v1.global_variables_initializer())
         output_feed = [self.probdist_start, self.probdist_end]
         [probdist_start, probdist_end] = session.run(output_feed, input_feed)
         return probdist_start, probdist_end
@@ -789,7 +789,7 @@ class QAModel(object):
         tic = time.time()
         loss_per_batch, batch_lengths = [], []
 
-        
+
         for batch in get_batch_generator(self.word2id, dev_context_path, dev_qn_path, dev_ans_path, self.FLAGS.batch_size, context_len=self.FLAGS.context_len, question_len=self.FLAGS.question_len, discard_long=True):
 
             # Get loss for this batch
@@ -843,7 +843,7 @@ class QAModel(object):
 
         tic = time.time()
 
-    
+
         for batch in get_batch_generator(self.word2id, context_path, qn_path, ans_path, self.FLAGS.batch_size, context_len=self.FLAGS.context_len, question_len=self.FLAGS.question_len, discard_long=False):
 
             pred_start_pos, pred_end_pos = self.get_start_end_pos(session, batch)
@@ -871,10 +871,10 @@ class QAModel(object):
                 em_total += em
 
                 # Optionally pretty-print
-                
+
                 if print_to_screen:
                     print_example(self.word2id, batch.context_tokens[ex_idx], batch.qn_tokens[ex_idx], batch.ans_span[ex_idx, 0], batch.ans_span[ex_idx, 1], pred_ans_start, pred_ans_end, true_answer, pred_answer, f1, em)
-                
+
                 if num_samples != 0 and example_num >= num_samples:
                     break
 
@@ -901,8 +901,8 @@ class QAModel(object):
 
         # Print number of model parameters
         tic = time.time()
-        params = tf.trainable_variables()
-        num_params = sum(map(lambda t: np.prod(tf.shape(t.value()).eval()), params))
+        params = tf.compat.v1.trainable_variables()
+        num_params = sum(map(lambda t: np.prod(tf.compat.v1.shape(t.value()).eval()), params))
         toc = time.time()
         logging.info("Number of params: %d (retrieval took %f secs)" % (num_params, toc - tic))
 
@@ -918,7 +918,7 @@ class QAModel(object):
         best_dev_em = None
 
         # for TensorBoard
-        summary_writer = tf.summary.FileWriter(self.FLAGS.train_dir, session.graph)
+        summary_writer = tf.compat.v1.summary.FileWriter(self.FLAGS.train_dir, session.graph)
 
         epoch = 0
 
@@ -992,6 +992,6 @@ class QAModel(object):
 
 def write_summary(value, tag, summary_writer, global_step):
     """Write a single summary value to tensorboard"""
-    summary = tf.Summary()
+    summary = tf.compat.v1.Summary()
     summary.value.add(tag=tag, simple_value=value)
     summary_writer.add_summary(summary, global_step)

@@ -32,9 +32,9 @@ class RNNEncoder(object):
         """
         self.hidden_size = hidden_size
         self.keep_prob = keep_prob
-        self.rnn_cell_fw = rnn_cell.GRUCell(self.hidden_size,kernel_initializer=tf.contrib.layers.xavier_initializer())
+        self.rnn_cell_fw = rnn_cell.GRUCell(self.hidden_size,kernel_initializer=tf.keras.initializers.glorot_normal())
         self.rnn_cell_fw = DropoutWrapper(self.rnn_cell_fw, input_keep_prob=self.keep_prob)
-        self.rnn_cell_bw = rnn_cell.GRUCell(self.hidden_size,kernel_initializer=tf.contrib.layers.xavier_initializer())
+        self.rnn_cell_bw = rnn_cell.GRUCell(self.hidden_size,kernel_initializer=tf.keras.initializers.glorot_normal())
         self.rnn_cell_bw = DropoutWrapper(self.rnn_cell_bw, input_keep_prob=self.keep_prob)
 
     def build_graph(self, inputs, masks,name):
@@ -43,24 +43,24 @@ class RNNEncoder(object):
           inputs: Tensor shape (batch_size, seq_len, input_size)
           masks: Tensor shape (batch_size, seq_len).
             Has 1s where there is real input, 0s where there's padding.++
-            This is used to make sure tf.nn.bidirectional_dynamic_rnn doesn't iterate through masked steps.
+            This is used to make sure tf.compat.v1.nn.bidirectional_dynamic_rnn doesn't iterate through masked steps.
 
         Returns:
           out: Tensor shape (batch_size, seq_len, hidden_size*2).
             This is all hidden states (fw and bw hidden states are concatenated).
         """
         with vs.variable_scope(name):
-            input_lens = tf.reduce_sum(masks, reduction_indices=1) # shape (batch_size)
+            input_lens = tf.compat.v1.reduce_sum(masks, reduction_indices=1) # shape (batch_size)
 
             # Note: fw_out and bw_out are the hidden states for every timestep.
             # Each is shape (batch_size, seq_len, hidden_size).
-            (fw_out, bw_out), _ = tf.nn.bidirectional_dynamic_rnn(self.rnn_cell_fw, self.rnn_cell_bw, inputs, input_lens, dtype=tf.float32)
+            (fw_out, bw_out), _ = tf.compat.v1.nn.bidirectional_dynamic_rnn(self.rnn_cell_fw, self.rnn_cell_bw, inputs, input_lens, dtype=tf.compat.v1.float32)
 
             # Concatenate the forward and backward hidden states
-            out = tf.concat([fw_out, bw_out], 2)
+            out = tf.compat.v1.concat([fw_out, bw_out], 2)
 
             # Apply dropout
-            out = tf.nn.dropout(out, self.keep_prob)
+            out = tf.compat.v1.nn.dropout(out, self.keep_prob)
 
             return out
 
@@ -89,14 +89,14 @@ class RNNEncoderLSTM(object):
           inputs: Tensor shape (batch_size, seq_len, input_size)
           masks: Tensor shape (batch_size, seq_len).
             Has 1s where there is real input, 0s where there's padding.++
-            This is used to make sure tf.nn.bidirectional_dynamic_rnn doesn't iterate through masked steps.
+            This is used to make sure tf.compat.v1.nn.bidirectional_dynamic_rnn doesn't iterate through masked steps.
 
         Returns:
           out: Tensor shape (batch_size, seq_len, hidden_size*2).
             This is all hidden states (fw and bw hidden states are concatenated).
         """
         with vs.variable_scope(name):
-            input_lens = tf.reduce_sum(masks, reduction_indices=1) # shape (batch_size)
+            input_lens = tf.compat.v1.reduce_sum(masks, reduction_indices=1) # shape (batch_size)
 
 
 
@@ -104,13 +104,13 @@ class RNNEncoderLSTM(object):
 
             # Note: fw_out and bw_out are the hidden states for every timestep.
             # Each is shape (batch_size, seq_len, hidden_size).
-            (fw_out, bw_out), _ = tf.nn.bidirectional_dynamic_rnn(self.rnn_cell_fw, self.rnn_cell_bw, inputs, input_lens, dtype=tf.float32)
+            (fw_out, bw_out), _ = tf.compat.v1.nn.bidirectional_dynamic_rnn(self.rnn_cell_fw, self.rnn_cell_bw, inputs, input_lens, dtype=tf.compat.v1.float32)
 
             # Concatenate the forward and backward hidden states
-            out = tf.concat([fw_out, bw_out], 2)
+            out = tf.compat.v1.concat([fw_out, bw_out], 2)
 
             # Apply dropout
-            out = tf.nn.dropout(out, self.keep_prob)
+            out = tf.compat.v1.nn.dropout(out, self.keep_prob)
 
             return out
 
@@ -144,9 +144,9 @@ class SimpleSoftmaxLayer(object):
         with vs.variable_scope("SimpleSoftmaxLayer"):
 
             # Linear downprojection layer
-            logits = tf.contrib.layers.fully_connected(inputs, num_outputs=1, activation_fn=None) # shape (batch_size, seq_len, 1)
+            logits = tf.compat.v1.layers.dense(inputs, 1) # shape (batch_size, seq_len, 1)
 
-            logits = tf.squeeze(logits, axis=[2]) # shape (batch_size, seq_len)
+            logits = tf.compat.v1.squeeze(logits, axis=[2]) # shape (batch_size, seq_len)
 
             # Take softmax over sequence
             masked_logits, prob_dist = masked_softmax(logits, masks, 1)
@@ -165,9 +165,9 @@ class SimpleSoftmaxLayerNew(object):
         with vs.variable_scope("SimpleSoftmaxLayer"):
 
             # Linear downprojection layer
-            #logits = tf.contrib.layers.fully_connected(inputs, num_outputs=1, activation_fn=None) # shape (batch_size, seq_len, 1)
+            #logits = tf.compat.v1.contrib.layers.fully_connected(inputs, num_outputs=1, activation_fn=None) # shape (batch_size, seq_len, 1)
 
-            #logits = tf.squeeze(logits, axis=[2]) # shape (batch_size, seq_len)
+            #logits = tf.compat.v1.squeeze(logits, axis=[2]) # shape (batch_size, seq_len)
 
             # Take softmax over sequence
             masked_logits, prob_dist = masked_softmax(logits, masks, 1)
@@ -216,16 +216,16 @@ class BasicAttn(object):
             print(values.get_shape().as_list())
             ##time.sleep(100)
             # Calculate attention distribution
-            values_t = tf.transpose(values, perm=[0, 2, 1]) # (batch_size, hidden, num_values)
+            values_t = tf.compat.v1.transpose(values, perm=[0, 2, 1]) # (batch_size, hidden, num_values)
 
-            WLin = tf.get_variable("WLin", [hidden_len,hidden_len],trainable=True)
+            WLin = tf.compat.v1.get_variable("WLin", [hidden_len,hidden_len],trainable=True)
 
             print("WLin",WLin.get_shape().as_list())
 
-            values_t_transpose = tf.transpose(values,perm=[0,2,1])          #Create (batch,hidden,questions)
-            values_t_transpose_2 = tf.transpose(values_t_transpose,perm=[1,0,2])     #transpose it so can be multiplied with (2h,2h)
+            values_t_transpose = tf.compat.v1.transpose(values,perm=[0,2,1])          #Create (batch,hidden,questions)
+            values_t_transpose_2 = tf.compat.v1.transpose(values_t_transpose,perm=[1,0,2])     #transpose it so can be multiplied with (2h,2h)
 
-            dimension_values_t = tf.shape(values)
+            dimension_values_t = tf.compat.v1.shape(values)
 
             dimension_row = dimension_values_t[2]
             dimension_col = dimension_values_t[0] * dimension_values_t[1]
@@ -235,58 +235,58 @@ class BasicAttn(object):
 
             print(values_t_transpose_2.get_shape().as_list())
             #time.sleep(100)
-            values_t_reshape = tf.reshape(values_t_transpose_2,[dimension_row,dimension_col]) #Multuply this with (2h,2h) #Its size is (hidden,batch*question)
+            values_t_reshape = tf.compat.v1.reshape(values_t_transpose_2,[dimension_row,dimension_col]) #Multuply this with (2h,2h) #Its size is (hidden,batch*question)
 
 
 
-            Multiply1 = tf.matmul(tf.transpose(WLin),values_t_reshape)
+            Multiply1 = tf.compat.v1.matmul(tf.compat.v1.transpose(WLin),values_t_reshape)
 
 
-            Multiply1_reshape_new = tf.reshape(Multiply1,[dimension_values_t[2],dimension_values_t[0],dimension_values_t[1]]) 
-            Multiply1_reshape = tf.transpose(Multiply1_reshape_new,perm=[1,0,2]) #(batch,2h,questions)
+            Multiply1_reshape_new = tf.compat.v1.reshape(Multiply1,[dimension_values_t[2],dimension_values_t[0],dimension_values_t[1]]) 
+            Multiply1_reshape = tf.compat.v1.transpose(Multiply1_reshape_new,perm=[1,0,2]) #(batch,2h,questions)
 
 
-            keys_transpose = tf.transpose(keys,perm=[0,2,1])          #Create (batch,hidden,paragraph)
-            keys_transpose_2 = tf.transpose(keys_transpose,perm=[1,0,2])     #transpose it so can be multiplied with (2h,2h)
+            keys_transpose = tf.compat.v1.transpose(keys,perm=[0,2,1])          #Create (batch,hidden,paragraph)
+            keys_transpose_2 = tf.compat.v1.transpose(keys_transpose,perm=[1,0,2])     #transpose it so can be multiplied with (2h,2h)
 
-            dimension_values_keys = [tf.shape(keys)[0],tf.shape(keys)[1],tf.shape(keys)[2]]
+            dimension_values_keys = [tf.compat.v1.shape(keys)[0],tf.compat.v1.shape(keys)[1],tf.compat.v1.shape(keys)[2]]
             dimension_row = dimension_values_keys[2]
             dimension_col = dimension_values_keys[0]* dimension_values_keys[1]
 
-            keys_reshape = tf.reshape(keys_transpose_2,[dimension_row,dimension_col]) #Multuply this with (2h,2h)
+            keys_reshape = tf.compat.v1.reshape(keys_transpose_2,[dimension_row,dimension_col]) #Multuply this with (2h,2h)
 
-            Multiply2 = tf.matmul(WLin,keys_reshape)
+            Multiply2 = tf.compat.v1.matmul(WLin,keys_reshape)
 
-            Multiply2_reshape_new = tf.reshape(Multiply2,[dimension_values_keys[2],dimension_values_keys[0],dimension_values_keys[1]])
-            Multiply2_reshape = tf.transpose(Multiply2_reshape_new,perm=[1,0,2]) #(batch,2h,paragraph)
-
-
-            Multiply_attention = tf.matmul(tf.nn.relu(tf.transpose(Multiply1_reshape,perm=[0,2,1])),tf.nn.relu(Multiply2_reshape))
-
-            Multiply_attention_order = tf.transpose(Multiply_attention,perm=[0,2,1]) #(batch,paragraph,questions)
+            Multiply2_reshape_new = tf.compat.v1.reshape(Multiply2,[dimension_values_keys[2],dimension_values_keys[0],dimension_values_keys[1]])
+            Multiply2_reshape = tf.compat.v1.transpose(Multiply2_reshape_new,perm=[1,0,2]) #(batch,2h,paragraph)
 
 
+            Multiply_attention = tf.compat.v1.matmul(tf.compat.v1.nn.relu(tf.compat.v1.transpose(Multiply1_reshape,perm=[0,2,1])),tf.compat.v1.nn.relu(Multiply2_reshape))
 
-            attn_logits = tf.matmul(keys, values_t) # shape (batch_size, num_keys, num_values)
+            Multiply_attention_order = tf.compat.v1.transpose(Multiply_attention,perm=[0,2,1]) #(batch,paragraph,questions)
 
-            attn_logits_mask = tf.expand_dims(values_mask, 1) # shape (batch_size, 1, num_values)
+
+
+            attn_logits = tf.compat.v1.matmul(keys, values_t) # shape (batch_size, num_keys, num_values)
+
+            attn_logits_mask = tf.compat.v1.expand_dims(values_mask, 1) # shape (batch_size, 1, num_values)
 
             _, attn_dist = masked_softmax(attn_logits, attn_logits_mask, 2) # shape (batch_size, num_keys, num_values). take softmax over values
 
             # Use attention distribution to take weighted sum of values
-            output = tf.matmul(attn_dist, values) # shape (batch_size, num_keys, value_vec_size)
+            output = tf.compat.v1.matmul(attn_dist, values) # shape (batch_size, num_keys, value_vec_size)
 
 
 
             # Apply dropout
-            output = tf.nn.dropout(output, self.keep_prob)
+            output = tf.compat.v1.nn.dropout(output, self.keep_prob)
 
             return attn_dist, output, Multiply_attention_order
 
 
 def masked_softmax(logits, mask, dim):
     
-    exp_mask = (1 - tf.cast(mask, 'float')) * (-1e30) # -large where there's padding, 0 elsewhere
-    masked_logits = tf.add(logits, exp_mask) # where there's padding, set logits to -large
-    prob_dist = tf.nn.softmax(masked_logits, dim)
+    exp_mask = (1 - tf.compat.v1.cast(mask, 'float')) * (-1e30) # -large where there's padding, 0 elsewhere
+    masked_logits = tf.compat.v1.add(logits, exp_mask) # where there's padding, set logits to -large
+    prob_dist = tf.compat.v1.nn.softmax(masked_logits, dim)
     return masked_logits, prob_dist

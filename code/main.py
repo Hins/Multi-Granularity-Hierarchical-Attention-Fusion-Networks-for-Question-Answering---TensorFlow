@@ -26,9 +26,8 @@ import time
 import tensorflow as tf
 
 
-from qa_model import QAModel
-from qa_model import PreQAModel
-from qa_model_base import QAModelInfer
+from qa_model_base import QAModel
+from qa_model_base import PreQAModel
 from vocab import get_glove
 from official_eval_helper import get_json_data, generate_answers
 
@@ -41,37 +40,37 @@ EXPERIMENTS_DIR = os.path.join(MAIN_DIR, "experiments") # relative path of exper
 
 
 # High-level options
-tf.app.flags.DEFINE_integer("gpu", 0, "Which GPU to use, if you have multiple.")
-tf.app.flags.DEFINE_string("mode", "train", "Available modes: train / show_examples / official_eval")
-tf.app.flags.DEFINE_string("experiment_name", "", "Unique name for your experiment. This will create a directory by this name in the experiments/ directory, which will hold all data related to this experiment")
-tf.app.flags.DEFINE_integer("num_epochs", 0, "Number of epochs to train. 0 means train indefinitely")
+tf.compat.v1.app.flags.DEFINE_integer("gpu", 0, "Which GPU to use, if you have multiple.")
+tf.compat.v1.app.flags.DEFINE_string("mode", "train", "Available modes: train / show_examples / official_eval")
+tf.compat.v1.app.flags.DEFINE_string("experiment_name", "", "Unique name for your experiment. This will create a directory by this name in the experiments/ directory, which will hold all data related to this experiment")
+tf.compat.v1.app.flags.DEFINE_integer("num_epochs", 0, "Number of epochs to train. 0 means train indefinitely")
 
 # Hyperparameters
-tf.app.flags.DEFINE_float("learning_rate", 0.005, "Learning rate.")
-tf.app.flags.DEFINE_float("max_gradient_norm", 5.0, "Clip gradients to this norm.")
-tf.app.flags.DEFINE_float("dropout", 0.15, "Fraction of units randomly dropped on non-recurrent connections.")
-tf.app.flags.DEFINE_integer("batch_size", 32, "Batch size to use")
-tf.app.flags.DEFINE_integer("hidden_size", 200, "Size of the hidden states")
-tf.app.flags.DEFINE_integer("context_len", 600, "The maximum context length of your model")
-tf.app.flags.DEFINE_integer("question_len", 30, "The maximum question length of your model")
-tf.app.flags.DEFINE_integer("embedding_size", 50, "Size of the pretrained word vectors. This needs to be one of the available GloVe dimensions: 50/100/200/300")
+tf.compat.v1.app.flags.DEFINE_float("learning_rate", 0.005, "Learning rate.")
+tf.compat.v1.app.flags.DEFINE_float("max_gradient_norm", 5.0, "Clip gradients to this norm.")
+tf.compat.v1.app.flags.DEFINE_float("dropout", 0.15, "Fraction of units randomly dropped on non-recurrent connections.")
+tf.compat.v1.app.flags.DEFINE_integer("batch_size", 32, "Batch size to use")
+tf.compat.v1.app.flags.DEFINE_integer("hidden_size", 200, "Size of the hidden states")
+tf.compat.v1.app.flags.DEFINE_integer("context_len", 600, "The maximum context length of your model")
+tf.compat.v1.app.flags.DEFINE_integer("question_len", 30, "The maximum question length of your model")
+tf.compat.v1.app.flags.DEFINE_integer("embedding_size", 50, "Size of the pretrained word vectors. This needs to be one of the available GloVe dimensions: 50/100/200/300")
 
 # How often to print, save, eval
-tf.app.flags.DEFINE_integer("print_every", 5, "How many iterations to do per print.")
-tf.app.flags.DEFINE_integer("save_every",500, "How many iterations to do per save.")
-tf.app.flags.DEFINE_integer("eval_every", 500, "How many iterations to do per calculating loss/f1/em on dev set. Warning: this is fairly time-consuming so don't do it too often.")
-tf.app.flags.DEFINE_integer("keep", 1, "How many checkpoints to keep. 0 indicates keep all (you shouldn't need to do keep all though - it's very storage intensive).")
+tf.compat.v1.app.flags.DEFINE_integer("print_every", 5, "How many iterations to do per print.")
+tf.compat.v1.app.flags.DEFINE_integer("save_every",500, "How many iterations to do per save.")
+tf.compat.v1.app.flags.DEFINE_integer("eval_every", 500, "How many iterations to do per calculating loss/f1/em on dev set. Warning: this is fairly time-consuming so don't do it too often.")
+tf.compat.v1.app.flags.DEFINE_integer("keep", 1, "How many checkpoints to keep. 0 indicates keep all (you shouldn't need to do keep all though - it's very storage intensive).")
 
 # Reading and saving data
-tf.app.flags.DEFINE_string("train_dir", "", "Training directory to save the model parameters and other info. Defaults to experiments/{experiment_name}")
-tf.app.flags.DEFINE_string("glove_path", "", "Path to glove .txt file. Defaults to data/glove.6B.{embedding_size}d.txt")
-tf.app.flags.DEFINE_string("data_dir", DEFAULT_DATA_DIR, "Where to find preprocessed SQuAD data for training. Defaults to data/")
-tf.app.flags.DEFINE_string("ckpt_load_dir", "", "For official_eval mode, which directory to load the checkpoint fron. You need to specify this for official_eval mode.")
-tf.app.flags.DEFINE_string("json_in_path", "", "For official_eval mode, path to JSON input file. You need to specify this for official_eval_mode.")
-tf.app.flags.DEFINE_string("json_out_path", "predictions.json", "Output path for official_eval mode. Defaults to predictions.json")
+tf.compat.v1.app.flags.DEFINE_string("train_dir", "", "Training directory to save the model parameters and other info. Defaults to experiments/{experiment_name}")
+tf.compat.v1.app.flags.DEFINE_string("glove_path", "", "Path to glove .txt file. Defaults to data/glove.6B.{embedding_size}d.txt")
+tf.compat.v1.app.flags.DEFINE_string("data_dir", DEFAULT_DATA_DIR, "Where to find preprocessed SQuAD data for training. Defaults to data/")
+tf.compat.v1.app.flags.DEFINE_string("ckpt_load_dir", "", "For official_eval mode, which directory to load the checkpoint fron. You need to specify this for official_eval mode.")
+tf.compat.v1.app.flags.DEFINE_string("json_in_path", "", "For official_eval mode, path to JSON input file. You need to specify this for official_eval_mode.")
+tf.compat.v1.app.flags.DEFINE_string("json_out_path", "predictions.json", "Output path for official_eval mode. Defaults to predictions.json")
 
 
-FLAGS = tf.app.flags.FLAGS
+FLAGS = tf.compat.v1.app.flags.FLAGS
 os.environ["CUDA_VISIBLE_DEVICES"] = str(FLAGS.gpu)
 
 
@@ -87,14 +86,14 @@ def initialize_model(session, model, train_dir, expect_exists):
         If False, initialize fresh model if no checkpoint is found.
     """
     print("Looking for model at %s..." % train_dir)
-    ckpt = tf.train.get_checkpoint_state(train_dir)
+    ckpt = tf.compat.v1.train.get_checkpoint_state(train_dir)
 
     print(ckpt)
     #time.sleep(100)
 
     v2_path = ckpt.model_checkpoint_path + ".index" if ckpt else ""
     if ckpt:
-        if (tf.gfile.Exists(ckpt.model_checkpoint_path) or tf.gfile.Exists(v2_path)):
+        if (tf.compat.v1.gfile.Exists(ckpt.model_checkpoint_path) or tf.compat.v1.gfile.Exists(v2_path)):
             print("Reading model parameters from %s" % ckpt.model_checkpoint_path)
             model.saver.restore(session, ckpt.model_checkpoint_path)
             model.save('my_model.h5')
@@ -103,8 +102,8 @@ def initialize_model(session, model, train_dir, expect_exists):
             raise Exception("There is no saved checkpoint at %s" % train_dir)
         else:
             print("There is no saved checkpoint at %s. Creating model with fresh parameters." % train_dir)
-            session.run(tf.global_variables_initializer())
-            print('Num params: %d' % sum(v.get_shape().num_elements() for v in tf.trainable_variables()))
+            session.run(tf.compat.v1.global_variables_initializer())
+            print('Num params: %d' % sum(v.get_shape().num_elements() for v in tf.compat.v1.trainable_variables()))
 
 
 def main(unused_argv):
@@ -136,7 +135,7 @@ def main(unused_argv):
     train_context_path = os.path.join(FLAGS.data_dir, "train.context")
     train_qn_path = os.path.join(FLAGS.data_dir, "train.question")
     train_ans_path = os.path.join(FLAGS.data_dir, "train.span")
-    qa_model_base = QAModel(FLAGS,id2word,word2id,emb_matrix)
+    #qa_model_base = QAModel(FLAGS,id2word,word2id,emb_matrix)
     dev_context_path = os.path.join(FLAGS.data_dir, "dev.context")
     dev_qn_path = os.path.join(FLAGS.data_dir, "dev.question")
     dev_ans_path = os.path.join(FLAGS.data_dir, "dev.span")
@@ -151,7 +150,7 @@ def main(unused_argv):
 
 
     # Some GPU settings
-    config=tf.ConfigProto()
+    config=tf.compat.v1.ConfigProto()
     config.gpu_options.allow_growth = True
 
     # Split by mode
@@ -170,23 +169,13 @@ def main(unused_argv):
         if not os.path.exists(bestmodel_dir):
             os.makedirs(bestmodel_dir)
 
-        with tf.Session(config=config) as sess:
+        with tf.compat.v1.Session(config=config) as sess:
 
             # Load most recent model
             initialize_model(sess, qa_model, FLAGS.train_dir, expect_exists=False)
 
             # Train
             qa_model.train(sess, train_context_path, train_qn_path, train_ans_path, dev_qn_path, dev_context_path, dev_ans_path)
-
-
-    elif FLAGS.mode == "show_examples":
-        with tf.Session(config=config) as sess:
-            qa_model=qa_model_base
-            # Load best model
-            initialize_model(sess, qa_model, bestmodel_dir, expect_exists=True)
-
-            # Show examples with F1/EM scores
-            _, _ = qa_model.check_f1_em(sess, dev_context_path, dev_qn_path, dev_ans_path, "dev", num_samples=5, print_to_screen=True)
 
     elif FLAGS.mode == "compare":
         
@@ -207,7 +196,7 @@ def main(unused_argv):
         # Read the JSON data from file
         qn_uuid_data, context_token_data, qn_token_data = get_json_data(FLAGS.json_in_path)
 
-        with tf.Session(config=config) as sess:
+        with tf.compat.v1.Session(config=config) as sess:
 
             # Load model from ckpt_load_dir
             initialize_model(sess, qa_model, FLAGS.ckpt_load_dir, expect_exists=True)
@@ -227,4 +216,4 @@ def main(unused_argv):
         raise Exception("Unexpected value of FLAGS.mode: %s" % FLAGS.mode)
 
 if __name__ == "__main__":
-    tf.app.run()
+    tf.compat.v1.app.run()
