@@ -31,7 +31,7 @@ UNK_ID = 1
 def get_glove(glove_path, glove_dim):
 
     print("Loading GLoVE vectors from file: %s" % glove_path)
-    vocab_size = int(4e5) # this is the vocab size of the corpus we've downloaded
+    vocab_size = int(199536) # this is the vocab size of the corpus we've downloaded
 
     emb_matrix = np.zeros((vocab_size + len(_START_VOCAB), glove_dim))
     word2id = {}
@@ -56,6 +56,9 @@ def get_glove(glove_path, glove_dim):
             word = line[0]
             vector = list(map(float, line[1:]))
             if glove_dim != len(vector):
+                print("glove_dim is ", glove_dim)
+                print("len(vector) is ", len(vector))
+                print("word is ", word)
                 raise Exception("You set --glove_path=%s but --embedding_size=%i. If you set --glove_path yourself then make sure that --embedding_size matches!" % (glove_path, glove_dim))
             emb_matrix[idx, :] = vector
             word2id[word] = idx

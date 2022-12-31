@@ -55,12 +55,12 @@ class RNNEncoder(object):
             # Note: fw_out and bw_out are the hidden states for every timestep.
             # Each is shape (batch_size, seq_len, hidden_size).
             (fw_out, bw_out), _ = tf.compat.v1.nn.bidirectional_dynamic_rnn(self.rnn_cell_fw, self.rnn_cell_bw, inputs, input_lens, dtype=tf.compat.v1.float32)
-
             # Concatenate the forward and backward hidden states
             out = tf.compat.v1.concat([fw_out, bw_out], 2)
-
             # Apply dropout
             out = tf.compat.v1.nn.dropout(out, self.keep_prob)
+            print("out shape is ")
+            print(out.get_shape().as_list())
 
             return out
 
@@ -191,7 +191,7 @@ class BasicAttn(object):
         self.key_vec_size = key_vec_size
         self.value_vec_size = value_vec_size
 
-    def build_graph(self, values, values_mask, keys,hidden_len):
+    def build_graph(self, values, values_mask, keys, WLin, hidden_len):
         """
         Keys attend to values.
         For each key, return an attention distribution and an attention output vector.
@@ -211,38 +211,39 @@ class BasicAttn(object):
             (using the attention distribution as weights).
         """
         with vs.variable_scope("BasicAttn"):
-
-
+            print("values in build_graph shape is ")
             print(values.get_shape().as_list())
             ##time.sleep(100)
             # Calculate attention distribution
-            values_t = tf.compat.v1.transpose(values, perm=[0, 2, 1]) # (batch_size, hidden, num_values)
-
-            WLin = tf.compat.v1.get_variable("WLin", [hidden_len,hidden_len],trainable=True)
+            values_t = tf.compat.v1.transpose(values, perm=[0, 2, 1]) # (batch_size, hidden, num_values) -> (
+            # batch_size, 200, 30)
 
             print("WLin",WLin.get_shape().as_list())
 
-            values_t_transpose = tf.compat.v1.transpose(values,perm=[0,2,1])          #Create (batch,hidden,questions)
-            values_t_transpose_2 = tf.compat.v1.transpose(values_t_transpose,perm=[1,0,2])     #transpose it so can be multiplied with (2h,2h)
+            values_t_transpose = tf.compat.v1.transpose(values,perm=[0,2,1])          #Create (batch,hidden,
+            # questions) -> (batch_size, 200, 30)
+            values_t_transpose_2 = tf.compat.v1.transpose(values_t_transpose,perm=[1,0,2])     #transpose it so can
+            # be multiplied with (2h,2h) -> (200, batch_size, 30)
 
             dimension_values_t = tf.compat.v1.shape(values)
 
-            dimension_row = dimension_values_t[2]
-            dimension_col = dimension_values_t[0] * dimension_values_t[1]
+            dimension_row = dimension_values_t[2]    # 200
+            dimension_col = dimension_values_t[0] * dimension_values_t[1]    # batch_size * 30
 
 
 
 
             print(values_t_transpose_2.get_shape().as_list())
             #time.sleep(100)
-            values_t_reshape = tf.compat.v1.reshape(values_t_transpose_2,[dimension_row,dimension_col]) #Multuply this with (2h,2h) #Its size is (hidden,batch*question)
+            values_t_reshape = tf.compat.v1.reshape(values_t_transpose_2,[dimension_row,dimension_col]) #Multuply
+            # this with (2h,2h) #Its size is (hidden,batch*question) -> (200, batch_size * 30)
 
 
 
             Multiply1 = tf.compat.v1.matmul(tf.compat.v1.transpose(WLin),values_t_reshape)
 
 
-            Multiply1_reshape_new = tf.compat.v1.reshape(Multiply1,[dimension_values_t[2],dimension_values_t[0],dimension_values_t[1]]) 
+            Multiply1_reshape_new = tf.compat.v1.reshape(Multiply1,[dimension_values_t[2],dimension_values_t[0],dimension_values_t[1]])
             Multiply1_reshape = tf.compat.v1.transpose(Multiply1_reshape_new,perm=[1,0,2]) #(batch,2h,questions)
 
 
@@ -257,7 +258,8 @@ class BasicAttn(object):
 
             Multiply2 = tf.compat.v1.matmul(WLin,keys_reshape)
 
-            Multiply2_reshape_new = tf.compat.v1.reshape(Multiply2,[dimension_values_keys[2],dimension_values_keys[0],dimension_values_keys[1]])
+            Multiply2_reshape_new = tf.compat.v1.reshape(Multiply2,[dimension_values_keys[2],dimension_values_keys[
+                0],dimension_values_keys[1]])
             Multiply2_reshape = tf.compat.v1.transpose(Multiply2_reshape_new,perm=[1,0,2]) #(batch,2h,paragraph)
 
 

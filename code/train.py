@@ -42,9 +42,9 @@ EXPERIMENTS_DIR = os.path.join(MAIN_DIR, "experiments") # relative path of exper
 
 # High-level options
 tf.compat.v1.app.flags.DEFINE_integer("gpu", 0, "Which GPU to use, if you have multiple.")
-tf.compat.v1.app.flags.DEFINE_string("mode", "official_eval", "Available modes: train / show_examples / official_eval")
+tf.compat.v1.app.flags.DEFINE_string("mode", "train", "Available modes: train / show_examples / official_eval")
 tf.compat.v1.app.flags.DEFINE_string("experiment_name", "", "Unique name for your experiment. This will create a directory by this name in the experiments/ directory, which will hold all data related to this experiment")
-tf.compat.v1.app.flags.DEFINE_integer("num_epochs", 0, "Number of epochs to train. 0 means train indefinitely")
+tf.compat.v1.app.flags.DEFINE_integer("num_epochs", 1, "Number of epochs to train. 0 means train indefinitely")
 
 # Hyperparameters
 tf.compat.v1.app.flags.DEFINE_float("learning_rate", 0.005, "Learning rate.")
@@ -108,7 +108,9 @@ def initialize_model(session, model, train_dir, expect_exists):
             print('Num params: %d' % sum(v.get_shape().num_elements() for v in tf.compat.v1.trainable_variables()))
 
 
-def main(input_path, result_path):
+def main(unused_argv):
+    if len(unused_argv) != 1:
+        raise Exception("There is a problem with how you entered flags: %s" % unused_argv)
     # Check for Python 2
 
     # Print out Tensorflow version
@@ -123,9 +125,11 @@ def main(input_path, result_path):
     bestmodel_dir = os.path.join(FLAGS.train_dir, "best_checkpoint")
 
     # Define path for glove vecs
-    # FLAGS.glove_path = FLAGS.glove_path or os.path.join(DEFAULT_DATA_DIR, "glove.6B.{}d.txt".format(
+    #FLAGS.glove_path = FLAGS.glove_path or os.path.join(DEFAULT_DATA_DIR, "glove.6B.{}d.txt".format(
     # FLAGS.embedding_size))
-    FLAGS.glove_path = "./data/cn_vectors.txt"
+    FLAGS.glove_path = FLAGS.glove_path or os.path.join(DEFAULT_DATA_DIR, "cn_vectors.txt")
+
+
     # Load embedding matrix and vocab mappings
     emb_matrix, word2id, id2word = get_glove(FLAGS.glove_path, FLAGS.embedding_size)
 
@@ -198,7 +202,6 @@ def main(input_path, result_path):
             qn_uuid_data, context_token_data, qn_token_data = get_json_data(str(file))
 
             with tf.compat.v1.Session(config=config) as sess:
-                #sess.run(tf.compat.v1.global_variables_initializer())
                 # Load model from ckpt_load_dir
                 initialize_model(sess, qa_model, FLAGS.ckpt_load_dir, expect_exists=True)
                 print("initialize mode complete")
@@ -228,3 +231,7 @@ def main(input_path, result_path):
             return len(answers_dict), test_time, answers_dict
     else:
         raise Exception("Unexpected value of FLAGS.mode: %s" % FLAGS.mode)
+
+
+if __name__ == "__main__":
+    tf.compat.v1.app.run()

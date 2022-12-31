@@ -134,7 +134,6 @@ class QAModel(object):
             self.bestmodel_saver = tf.compat.v1.train.Saver(tf.compat.v1.global_variables(), max_to_keep=1)
             self.summaries = tf.compat.v1.summary.merge_all()
 
-
     def add_placeholders(self):
         """
         Add placeholders to the graph. Placeholders are used to feed in inputs.
@@ -153,9 +152,6 @@ class QAModel(object):
         # This is necessary so that we can instruct the model to use dropout when training, but not when testing
         self.keep_prob = tf.compat.v1.placeholder_with_default(1.0, shape=(), name="keep_prob")
 
-
-
-
     def add_embedding_layer(self, emb_matrix):
         """
         Adds word embedding layer to the graph.
@@ -172,413 +168,20 @@ class QAModel(object):
             # Get the word embeddings for the context and question,
             # using the placeholders self.context_ids and self.qn_ids
             self.context_embs = embedding_ops.embedding_lookup(embedding_matrix, self.context_ids) # shape (batch_size, context_len, embedding_size)
+            print("self.context_embs shape is ")
+            print(self.context_embs.get_shape().as_list())
             self.qn_embs = embedding_ops.embedding_lookup(embedding_matrix, self.qn_ids) # shape (batch_size, question_len, embedding_size)
-
-
-    def matching_function(self,Tilda,Normal,name,NormalShape):                  #For the Mathcing ('m' function in Fusion function)
-
-        matrix_dimensions = tf.compat.v1.shape(Normal)
-        batch_size,matrix_size,hidden_size = matrix_dimensions[0],matrix_dimensions[1],matrix_dimensions[2]
-
-
-        Wf = tf.compat.v1.get_variable(name,shape=[NormalShape.get_shape().as_list()[1],4*NormalShape.get_shape().as_list()[1]],trainable=True)
-        tf.compat.v1.summary.histogram("weightsGating"+name, Wf)
-
-
-        #WfReshape = tf.compat.v1.transpose(Wf,perm=[1,0,2])
-
-        nameBias = name+"bias"
-        Bias = tf.compat.v1.get_variable(nameBias,shape=[1],trainable=True)
-        tf.compat.v1.summary.histogram("Bias"+name, Bias)
-
-        ElementWiseProduct = tf.compat.v1.multiply(Tilda,Normal)     #(batch,paragraph,hidden*2)
-
-        #ElementWiseProduct = tf.compat.v1.reshape(ElementWiseProductTemp,[batch_size,matrix_size,hidden_size])
-
-        SubtractMatrix = tf.compat.v1.subtract(Normal,Tilda)
-
-        ConcatMatrix = tf.compat.v1.concat([tf.compat.v1.concat([tf.compat.v1.concat([Normal,Tilda],0),ElementWiseProduct],0),SubtractMatrix],0) #(batch,4*paragraph,hidden*2)
-
-
-        print(Normal.get_shape().as_list())
-        print(ConcatMatrix.get_shape().as_list())
-
-
-
-        ConcatMatrixReshape = tf.compat.v1.reshape(tf.compat.v1.transpose(ConcatMatrix,perm=[1,0,2]),[4*matrix_size,batch_size*hidden_size])    #(4P,H*B)
-
-
-        Matching1 = tf.compat.v1.matmul(Wf,ConcatMatrixReshape)   #(P,H*B)
-
-        Matching2_new = tf.compat.v1.reshape(Matching1,[matrix_size,batch_size,hidden_size])  #(P,B,H)
-        Matching2_transpose = tf.compat.v1.transpose(Matching2_new,perm=[1,0,2]) #(B,P,H)
-        addBias = tf.compat.v1.add(Matching2_transpose,Bias)
-
-        matchingOutput = tf.compat.v1.nn.tanh(addBias)
-
-        return matchingOutput
-
-
-    def gating_function(self,Tilda,Normal,name,NormalShape):                  #For the Mathcing ('m' function in Fusion function)
-        matchingOutput = None
-        with vs.variable_scope(name+"SCOPE"):
-
-            matrix_dimensions = tf.compat.v1.shape(Normal)
-            batch_size,matrix_size,hidden_size = matrix_dimensions[0],matrix_dimensions[1],matrix_dimensions[2]
-
-
-            Wf = tf.compat.v1.get_variable(name,shape=[NormalShape.get_shape().as_list()[1],4*NormalShape.get_shape().as_list()[1]],trainable=True)
-            tf.compat.v1.summary.histogram("weightsGating"+name, Wf)
-
-
-            #WfReshape = tf.compat.v1.transpose(Wf,perm=[1,0,2])
-
-            nameBias = name+"bias"
-            Bias = tf.compat.v1.get_variable(nameBias,shape=[1],trainable=True)
-            tf.compat.v1.summary.histogram("Bias"+name, Bias)
-            ElementWiseProduct = tf.compat.v1.multiply(Tilda,Normal)     #(batch,paragraph,hidden*2)
-
-            #ElementWiseProduct = tf.compat.v1.reshape(ElementWiseProductTemp,[batch_size,matrix_size,hidden_size])
-
-            SubtractMatrix = tf.compat.v1.subtract(Normal,Tilda)
-
-            ConcatMatrix = tf.compat.v1.concat([tf.compat.v1.concat([tf.compat.v1.concat([Normal,Tilda],0),ElementWiseProduct],0),SubtractMatrix],0) #(batch,4*paragraph,hidden*2)
-
-
-            print(Normal.get_shape().as_list())
-            print(ConcatMatrix.get_shape().as_list())
-
-
-
-
-        ConcatMatrixReshape = tf.compat.v1.reshape(tf.compat.v1.transpose(ConcatMatrix,perm=[1,0,2]),[4*matrix_size,batch_size*hidden_size])    #(4P,H*B)
-
-
-        Matching1 = tf.compat.v1.matmul(Wf,ConcatMatrixReshape)   #(P,H*B)
-
-        Matching2_new = tf.compat.v1.reshape(Matching1,[matrix_size,batch_size,hidden_size])  #(P,B,H)
-        Matching2_transpose = tf.compat.v1.transpose(Matching2_new,perm=[1,0,2]) #(B,P,H)
-        addBias = tf.compat.v1.add(Matching2_transpose,Bias)
-
-        matchingOutput = tf.compat.v1.nn.sigmoid(addBias)
-
-        return matchingOutput
-
-
-
-
-
-    def Fuse(self,Tilda,Normal,name1,name2,NormalShape):
-        gatingOutput = self.gating_function(Tilda,Normal,name1,NormalShape)
-        matchingOutput = self.matching_function(Tilda,Normal,name2,NormalShape)
-
-        print(gatingOutput.get_shape().as_list())
-        print(matchingOutput.get_shape().as_list())
-        ##time.sleep(100)
-
-        returnNewTildaPart1 = tf.compat.v1.multiply(gatingOutput,matchingOutput)
-        returnNewTildaPart2 = tf.compat.v1.multiply(gatingOutput,tf.compat.v1.subtract(1.00,matchingOutput))
-
-        returnNewTilda = tf.compat.v1.add(returnNewTildaPart1,returnNewTildaPart2)
-
-
-        return returnNewTilda
-
-
-        '''
-    def gating_function(self,Tilda,Normal,name,NormalShape):
-
-
-        print("shape new",Normal.get_shape().as_list())
-        #####time.sleep(10)
-        matrix_dimensions = tf.compat.v1.shape(Normal)
-        batch_size,matrix_size,hidden_size = matrix_dimensions[0],matrix_dimensions[1],matrix_dimensions[2]
-
-
-        print(matrix_size)
-        print(name)
-        #####time.sleep(15)
-        Wf = tf.compat.v1.get_variable(name,shape=[4*NormalShape.get_shape().as_list()[1],1])
-
-        nameBias = name+"bias"
-        Bias = tf.compat.v1.get_variable(nameBias,shape=[1])
-
-        ElementWiseProduct = tf.compat.v1.multiply(Tilda,Normal)
-
-        SubtractMatrix = tf.compat.v1.subtract(Normal,Tilda)
-
-        ConcatMatrix = tf.compat.v1.concat([tf.compat.v1.concat([tf.compat.v1.concat([Normal,Tilda],1),ElementWiseProduct],1),SubtractMatrix],1) #(batch,4*paragraph,hidden*2)
-
-        print(Normal.get_shape().as_list())
-        print(Tilda.get_shape().as_list())
-        print(ElementWiseProduct.get_shape().as_list())
-        print(SubtractMatrix.get_shape().as_list())
-        print(ConcatMatrix.get_shape().as_list())
-
-
-
-        ConcatMatrixReshape = tf.compat.v1.reshape(tf.compat.v1.transpose(ConcatMatrix,perm=[1,0,2]),[4*matrix_size,batch_size*hidden_size])
-
-        Matching1 = tf.compat.v1.matmul(tf.compat.v1.transpose(Wf,perm=[1,0]),ConcatMatrixReshape)
-
-        print(Matching1.get_shape().as_list())
-
-        Matching2 = tf.compat.v1.reshape(Matching1,[batch_size,1,hidden_size])
-
-
-        addBias = tf.compat.v1.add(Matching2,Bias)
-
-
-        gatingOutput = tf.compat.v1.nn.sigmoid(addBias)
-
-        return gatingOutput
-
-    def Fuse(self,Tilda,Normal,name1,name2,NormalShape):
-
-        gatingOutput = self.gating_function(Tilda,Normal,name1,NormalShape)
-        matchingOutput = self.matching_function(Tilda,Normal,name2,NormalShape)
-
-        print(gatingOutput.get_shape().as_list())
-        print(matchingOutput.get_shape().as_list())
-        ####time.sleep(10)
-
-        returnNewTildaPart1 = tf.compat.v1.matmul(matchingOutput,tf.compat.v1.transpose(gatingOutput,perm=[0,2,1]))
-
-        returnNewTildaPart2 = tf.compat.v1.matmul(matchingOutput,tf.compat.v1.transpose(tf.compat.v1.subtract(1.00,gatingOutput),perm=[0,2,1]))
-
-        returnNewTilda = tf.compat.v1.add(returnNewTildaPart1,returnNewTildaPart2)
-
-        return returnNewTilda
-
-        #returnNewTildaPart1 = tf.compat.v1.matmul(matching_function(Tilda,Normal,name1),tf.compat.v1.transpose(gating_function(Tilda,Normal,name2),perm=[0,2,1]))
-        #returnNewTildaPart2 = tf.compat.v1.matmul(Normal,tf.compat.v1.subtract(1,gating_function(Tilda,Normal,name)))
-        '''
-
+            print("self.qn_embs shape is ")
+            print(self.qn_embs.get_shape().as_list())
 
     def build_graph_middle(self,new_attn,attn_output,context_hiddens,question_hiddens):
-
-
-        matrix_dimensions_answer = context_hiddens.get_shape().as_list()
-        batch_size_answer,matrix_size_answer,hidden_size_answer = matrix_dimensions_answer[0],matrix_dimensions_answer[1],matrix_dimensions_answer[2]
-
-
-
-        matrix_dimensions_question =  question_hiddens.get_shape().as_list()
-        batch_size_question,matrix_size_question,hidden_size_question = matrix_dimensions_question[0],matrix_dimensions_question[1],matrix_dimensions_question[2]
-
-
-
-        print(matrix_dimensions_answer,matrix_dimensions_question)
-        ##time.sleep(100)
-
-        #Add attention over attention code
-
-
-
-        print("question",question_hiddens.get_shape().as_list())
-        print("pargraph",context_hiddens.get_shape().as_list())
-        print("attention matrix",new_attn.get_shape().as_list())
-
-
-        P2Q = tf.compat.v1.nn.softmax(new_attn,1)   #(batch,paragraph,questions)
-
-        QTilda = tf.compat.v1.matmul(P2Q,question_hiddens)        #(batch,paragraph,hidden*2) same as paragraph
-
-
-
-        Q2P = tf.compat.v1.nn.softmax(new_attn,2)
-
-        Q2PTranspose = tf.compat.v1.transpose(Q2P,perm=[0,2,1])
-
-        PTilda = tf.compat.v1.matmul(Q2PTranspose,context_hiddens)        #(batch,question,hidden*2) same as question
-
-
-        print("P2Q",P2Q.get_shape().as_list())
-        print("QTilda",QTilda.get_shape().as_list())
-        print("Q2P",Q2P.get_shape().as_list())
-        print("PTilda",PTilda.get_shape().as_list())
-
-
-        #Fusion layer below
-
-        #variable_temp = self.Fuse(QTilda,context_hiddens,"paragraphGate","paragraphMatch",context_hiddens)
-        #print(variable_temp.get_shape().as_list())
-        print("AAA")
-        ##time.sleep(100)
-
-
-        paragraphNew = self.Fuse(QTilda,context_hiddens,"paragraphGate","paragraphMatchYOYO",context_hiddens)    #(batch,paragraph,hidden)
-        paragraphNew.set_shape([None,matrix_size_answer,hidden_size_answer])
-        questionNew = self.Fuse(PTilda,question_hiddens,"questionGate","questionMatch",question_hiddens)      #(batch,question,hidden)
-        questionNew.set_shape([None,matrix_size_question,hidden_size_question])
-        ##time.sleep(100)
-
-        #paragraphNew = tf.compat.v1.Print(paragraphNew,[tf.compat.v1.shape(paragraphNew)])
-        #questionNew = tf.compat.v1.Print(questionNew,[tf.compat.v1.shape(questionNew)])
-
-
-
-        print(paragraphNew)
-        print(questionNew)
-
-        ##time.sleep(100)
-
-
-        #paragraphNewMask  = tf.compat.v1.placeholder(tf.compat.v1.int32, shape=[None, 1])
-        #questionNewMask  = tf.compat.v1.placeholder(tf.compat.v1.int32, shape=[None, 1])
-
-        encoder2 = RNNEncoder(self.FLAGS.hidden_size, self.keep_prob)
-        encoder2Q = RNNEncoder(self.FLAGS.hidden_size, self.keep_prob)
-
-        context_hiddens_new = encoder2.build_graph(paragraphNew, self.context_mask,"rnnencoder2")  #(batch,paragraph,context_len)
-        question_hiddens_new = encoder2Q.build_graph(questionNew, self.qn_mask,"rnnencoder2Q")   #(batch,question,context_len)
-
-        #context_hiddens_new = paragraphNew
-        #question_hiddens_new = questionNew
-
-        #context_hiddens_new = tf.compat.v1.Print(context_hiddens_new,[tf.compat.v1.shape(context_hiddens_new)])
-        #question_hiddens_new = tf.compat.v1.Print(question_hiddens_new,[tf.compat.v1.shape(question_hiddens_new)])
-
-
-        print(context_hiddens_new.get_shape().as_list())
-        print("****")
-        ####time.sleep(100)
-        matrix_dimensions = tf.compat.v1.shape(context_hiddens)
-        batch_size,matrix_size,hidden_size = matrix_dimensions[0],matrix_dimensions[1],matrix_dimensions[2]
-
-
-
-        #Second fusing layer and softmax layer
-        #New learnable matrix
-
-
-
-        W1 = tf.compat.v1.get_variable("W1",shape=[matrix_size_answer,matrix_size_answer],trainable=True) #(matrix_size,matrix_size)
-
-
-        #paragraphNewReshape = tf.compat.v1.reshape(context_hiddens_new,[batch_size*matrix_size,hidden_size])
-        paragraphNewTranspose = tf.compat.v1.transpose(context_hiddens_new,perm=[0,2,1])
-        paragraphNewReshape = tf.compat.v1.reshape(paragraphNewTranspose,[batch_size*hidden_size,matrix_size])    #(B*H,P)
-
-        paragraphTempRep = tf.compat.v1.matmul(paragraphNewReshape,W1)                                            #(B*H,P)
-
-        paragraphTempRep2 = tf.compat.v1.reshape(paragraphTempRep,[batch_size,hidden_size,matrix_size])
-        paragraphTempRep3 = tf.compat.v1.matmul(paragraphTempRep2,context_hiddens_new)
-        paragraphTempSoftmax = tf.compat.v1.nn.softmax(paragraphTempRep3)                             #(batch,hidden_size,hidden_size)
-
-        paragraphSelfAllign = tf.compat.v1.matmul(paragraphTempSoftmax,tf.compat.v1.transpose(context_hiddens_new,perm=[0,2,1]))
-
-        paragraphContextual = self.Fuse(tf.compat.v1.transpose(paragraphSelfAllign,perm=[0,2,1]),context_hiddens_new,"paragraphGate2","paragraphMatch2",context_hiddens) #(batch,pargraph,hidden)
-
-
-        print(paragraphContextual.get_shape().as_list())
-        #time.sleep(100)
-
-        #paragraphContextual = tf.compat.v1.Print(paragraphContextual,[tf.compat.v1.shape(paragraphContextual)])
-
-
-        '''
-        batch_size2,matrix_size2,hidden_size2 = matrix_dimensions2[0],matrix_dimensions2[1],matrix_dimensions2[2]
-        matrix_dimensions2 = tf.compat.v1.shape(context_hiddens_new)
-        questionNewReshape = tf.compat.v1.reshape(question_hiddens_new,[batch_size2*matrix_size2,hidden_size2])
-        questionTempRep = tf.compat.v1.matmul(tf.compat.v1.matmul(questionNewReshape,W1))
-        questionTempRep2 = tf.compat.v1.reshape(questionTempRep,[batch_size2,matrix_size2,hidden_size2])
-        questionTempRep3 = tf.compat.v1.matmul(questionTempRep2,tf.compat.v1.transpose(question_hiddens_new,dim=[0,2,1]))
-        questionTempSoftmax = tf.compat.v1.nn.softmax(questionTempRep3)
-
-        questionSelfAllign = tf.compat.v1.matmul(questionTempSoftmax,question_hiddens_new)
-        '''
-
-        encoder3 = RNNEncoder(self.FLAGS.hidden_size, self.keep_prob)
-
-
-
-        #pargraphContextualMask =  tf.compat.v1.placeholder(tf.compat.v1.int32, shape=[None, self.FLAGS.context_len])
-        paragraphContextual.set_shape([batch_size_answer,matrix_size_answer,hidden_size_answer])
-
-        print(batch_size_answer,matrix_size_answer,hidden_size_answer)
-        print(self.context_mask.get_shape().as_list())
-        #time.sleep(100)
-
-        paragraphContextual = paragraphContextual
-        #paragraphContextual=encoder3.build_graph(paragraphContextual, self.context_mask,"rnnencoder3")  #(batch,paragraph,context_len)
-
-
-        #Code to represent question
-        matrix_dimensions2 = tf.compat.v1.shape(question_hiddens)
-        batch_size2,matrix_size2,hidden_size2 = matrix_dimensions2[0],matrix_dimensions2[1],matrix_dimensions2[2]
-
-
-
-        #encoder4 = RNNEncoder(self.FLAGS.hidden_size, self.keep_prob)
-        #questionSelfAllignMask =  tf.compat.v1.placeholder(tf.compat.v1.int32, shape=[None, self.FLAGS.question_len])
-        questionSelfAllign = question_hiddens_new
-        #encoder4.build_graph(question_hiddens_new, self.qn_mask,"rnnencoder4")  #(batch,question,H)
-
-
-        Wq = tf.compat.v1.get_variable("Wq",shape=[1,question_hiddens.get_shape().as_list()[2]],trainable=True)      #(1,h)
-
-        questionSelfAllignTranspose = tf.compat.v1.transpose(questionSelfAllign,perm=[2,0,1])
-        questionSelfAllignReshape = tf.compat.v1.reshape(questionSelfAllignTranspose,[hidden_size2,matrix_size2*batch_size2])
-
-        GammaTemp = tf.compat.v1.matmul(Wq,questionSelfAllignReshape)
-        GammaTemp2 = tf.compat.v1.reshape(GammaTemp,[batch_size2,1,matrix_size2])
-        Gamma = tf.compat.v1.nn.softmax(GammaTemp2)      #(batch,1,question)
-
-        questionContextual = tf.compat.v1.matmul(Gamma,questionSelfAllign)    #(batch,1,hidden)
-
-        print(questionContextual.get_shape().as_list())
-        ###time.sleep(100)
-
-        #For start point of answer
-        WeightSoftmaxStart = tf.compat.v1.get_variable("WeightSoftmaxStart",[question_hiddens.get_shape().as_list()[2],question_hiddens.get_shape().as_list()[2]],trainable=True)
-        questionTranspose = tf.compat.v1.transpose(questionContextual,perm=[0,2,1])
-        questionContextualReshape = tf.compat.v1.reshape(questionTranspose,[batch_size,hidden_size])
-        tempMatrixMult1 = tf.compat.v1.matmul(questionContextualReshape,WeightSoftmaxStart)
-
-        tempMatrixMult1Reshape = tf.compat.v1.reshape(tempMatrixMult1,[batch_size,1,hidden_size])
-        probStartMatrix = tf.compat.v1.matmul(tempMatrixMult1Reshape,tf.compat.v1.transpose(paragraphContextual,perm=[0,2,1]))  #(b,1,n)
-        '''
-        paragraphContextualTranspose = tf.compat.v1.reshape(paragraphContextual,[batch_size*matrix_size,hidden_size])
-
-        tempMatrixMult1 = tf.compat.v1.matmul(paragraphContextualTranspose,WeightSoftmaxStart)
-        tempMatrixMult1Reshape = tf.compat.v1.reshape(tempMatrixMult1,[batch_size,matrix_size,1])
-
-        probStartMatrix = tf.compat.v1.matmul(tempMatrixMult1Reshape,questionContextual) #(batch,pargraph,context)
-        '''
-
-        #For end point of answer
-        WeightSoftmaxEnd = tf.compat.v1.get_variable("WeightSoftmaxEnd",[question_hiddens.get_shape().as_list()[2],question_hiddens.get_shape().as_list()[2]],trainable=True)
-        #questionTranspose = tf.compat.v1.transpose(questionContextual,perm=[0,2,1])
-        #questionContextualReshape = tf.compat.v1.reshape(questionTranspose,[batch_size,hidden_size])
-        tempMatrixMult2 = tf.compat.v1.matmul(questionContextualReshape,WeightSoftmaxEnd)
-        tempMatrixMult1Reshape2 = tf.compat.v1.reshape(tempMatrixMult2,[batch_size,1,hidden_size])
-        probEndMatrix = tf.compat.v1.matmul(tempMatrixMult1Reshape2,tf.compat.v1.transpose(paragraphContextual,perm=[0,2,1])) #(b,1,n)
-
-
-        print(probStartMatrix.get_shape().as_list())
-        print(probEndMatrix.get_shape().as_list())
-        print("**************")
-
-
-        probStartMatrix = tf.compat.v1.reshape(probStartMatrix,[batch_size,matrix_size])
-        probEndMatrix = tf.compat.v1.reshape(probEndMatrix,[batch_size,matrix_size])
-
-        # Concat attn_output to context_hiddens to get blended_reps
         blended_reps = tf.compat.v1.concat([context_hiddens, attn_output], axis=2) # (batch_size, context_len, hidden_size*4)
 
         # Apply fully connected layer to each blended representation
         # Note, blended_reps_final corresponds to b' in the handout
         # Note, tf.compat.v1.contrib.layers.fully_connected applies a ReLU non-linarity here by default
         blended_reps_final = tf.compat.v1.layers.dense(blended_reps, self.FLAGS.hidden_size) # blended_reps_final is shape (batch_size, context_len, hidden_size)
-
-
-        return probStartMatrix,probEndMatrix,blended_reps_final
-
-
-
-
-
+        return None,None,blended_reps_final
 
     def build_graph(self):
         """Builds the main part of the graph for the model, starting from the input embeddings to the final distributions for the answer span.
@@ -597,26 +200,53 @@ class QAModel(object):
 
         encoder = RNNEncoder(self.FLAGS.hidden_size, self.keep_prob)
         encoderQ = RNNEncoder(self.FLAGS.hidden_size, self.keep_prob)
-        context_hiddens = encoder.build_graph(self.context_embs, self.context_mask,"rnnencoder1") # (batch_size, context_len, hidden_size*2)
-        question_hiddens = encoderQ.build_graph(self.qn_embs, self.qn_mask,"rnnencoderQ") # (batch_size, question_len, ,"rnnencoder1"hidden_size*2)
+        context_hiddens = encoder.build_graph(self.context_embs, self.context_mask,"rnnencoder1") # (batch_size,
+        # context_len, hidden_size*2)
+        '''
+        context_hiddens = tf.compat.v1.concat([self.context_embs, self.context_embs], axis=2)
+        context_hiddens = tf.compat.v1.concat([context_hiddens, context_hiddens], axis=2)
+        '''
+        print("context_hiddens shape is ")
+        print(context_hiddens.get_shape().as_list())
+
+        question_hiddens = encoderQ.build_graph(self.qn_embs, self.qn_mask,"rnnencoderQ") # (batch_size,
+        # question_len, ,"rnnencoder1"hidden_size*2)
+        '''
+        question_hiddens = tf.compat.v1.concat([self.qn_embs, self.qn_embs], axis=2)
+        question_hiddens = tf.compat.v1.concat([question_hiddens, question_hiddens], axis=2)
+        '''
+        print("question_hiddens shape is ")
+        print(question_hiddens.get_shape().as_list())
 
         # Use context hidden states to attend to question hidden states
         attn_layer = BasicAttn(self.keep_prob, self.FLAGS.hidden_size*2, self.FLAGS.hidden_size*2)
-        _, attn_output,new_attn = attn_layer.build_graph(question_hiddens, self.qn_mask, context_hiddens,2*self.FLAGS.hidden_size) # attn_output is shape (batch_size, context_len, hidden_size*2)
+        WLin = tf.compat.v1.get_variable("WLin", [2*self.FLAGS.hidden_size, 2*self.FLAGS.hidden_size],
+                                            trainable=False, initializer=tf.keras.initializers.glorot_normal())
+        _, self.attn_output,self.new_attn = attn_layer.build_graph(question_hiddens, self.qn_mask,
+                                                               context_hiddens, WLin,
+                                                         2*self.FLAGS.hidden_size) # attn_output is shape (batch_size, context_len, hidden_size*2)
 
-        _,_,blended_reps_final=self.build_graph_middle(new_attn,attn_output,context_hiddens,question_hiddens)
+        _,_,self.blended_reps_final=self.build_graph_middle(self.new_attn, self.attn_output, context_hiddens,
+                                                            question_hiddens)
+
+        print("blended_reps_final shape is ")
+        print(self.blended_reps_final.get_shape().as_list())
+        print("context_mask shape is ")
+        print(self.context_mask.get_shape().as_list())
 
         # Use softmax layer to compute probability distribution for start location
         # Note this produces self.logits_start and self.probdist_start, both of which have shape (batch_size, context_len)
         with vs.variable_scope("StartDist"):
             softmax_layer_start = SimpleSoftmaxLayer()
-            self.logits_start, self.probdist_start = softmax_layer_start.build_graph(blended_reps_final, self.context_mask)
+            self.logits_start, self.probdist_start = softmax_layer_start.build_graph(self.blended_reps_final,
+                                                                                 self.context_mask)
 
         # Use softmax layer to compute probability distribution for end location
         # Note this produces self.logits_end and self.probdist_end, both of which have shape (batch_size, context_len)
         with vs.variable_scope("EndDist"):
             softmax_layer_end = SimpleSoftmaxLayer()
-            self.logits_end, self.probdist_end = softmax_layer_end.build_graph(blended_reps_final, self.context_mask)
+            self.logits_end, self.probdist_end = softmax_layer_start.build_graph(self.blended_reps_final,
+                                                                           self.context_mask)
 
 
 
@@ -746,9 +376,10 @@ class QAModel(object):
         input_feed[self.qn_ids] = batch.qn_ids
         input_feed[self.qn_mask] = batch.qn_mask
         # note you don't supply keep_prob here, so it will default to 1 i.e. no dropout
-        session.run(tf.compat.v1.global_variables_initializer())
+        #session.run(tf.compat.v1.global_variables_initializer())
         output_feed = [self.probdist_start, self.probdist_end]
         [probdist_start, probdist_end] = session.run(output_feed, input_feed)
+
         return probdist_start, probdist_end
 
 

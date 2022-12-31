@@ -250,6 +250,7 @@ def generate_answers(session, model, word2id, qn_uuid_data, context_token_data, 
         # Get the predicted spans
         pred_start_batch, pred_end_batch = model.get_start_end_pos(session, batch)
 
+
         # Convert pred_start_batch and pred_end_batch to lists length batch_size
         pred_start_batch = pred_start_batch.tolist()
         pred_end_batch = pred_end_batch.tolist()
@@ -263,6 +264,11 @@ def generate_answers(session, model, word2id, qn_uuid_data, context_token_data, 
             # Check the predicted span is in range
             assert pred_start in range(len(context_tokens))
             assert pred_end in range(len(context_tokens))
+
+            if pred_start > pred_end:
+                tmp = pred_start
+                pred_start = pred_end
+                pred_end = tmp
 
             # Predicted answer tokens
             pred_ans_tokens = context_tokens[pred_start : pred_end +1] # list of strings
